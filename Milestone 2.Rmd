@@ -1,0 +1,32 @@
+---
+title: "Milestone 2"
+author: "Tim Ravis"
+date: "2/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include = FALSE}
+
+# load packages, setwd
+
+library(tidyverse)
+
+# load data
+
+x1 <- read_csv("TitlingDeforestation/BHM_sample20.csv")
+
+# make the data a tibble
+
+x1 <- as_tibble(x1)
+
+# what's the data look like?
+
+print(str(x1)) 
+
+```
+
+My repo is at:         <a href="https://github.com/soetimno/ravis_1006_final_project.git'">https://github.com/soetimno/ravis_1006_final_project.git'</a>
