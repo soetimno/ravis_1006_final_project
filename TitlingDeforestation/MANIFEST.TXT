@@ -1,0 +1,4 @@
+BHM_GEC_replication.R (type/x-r-syntax) 52814 bytes.
+BHM_GIS_database.zip (application/zip) 79174645 bytes.
+BHM_Metadata.xlsx (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet) 52395 bytes.
+BHM_sample20.csv (text/csv) 97464483 bytes.
