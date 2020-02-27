@@ -24,7 +24,8 @@ require(coefplot) #Version 1.2.0
 require(ggplot2) #Version 1.0.1
 require(rgenoud)
 
-# setwd("/Users/DanielAvram/Desktop/TitlingDeforestation")
+
+
 
 data <- read.csv("TitlingDeforestation/BHM_sample20.csv")
 

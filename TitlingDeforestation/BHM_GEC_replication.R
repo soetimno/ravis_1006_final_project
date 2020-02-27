@@ -19,10 +19,11 @@ require(arm) #Version 1.7-07
 require(MatchIt) #Version 2.4-21
 require(coefplot) #Version 1.2.0
 require(ggplot2) #Version 1.0.1
+require(rgenoud)
 
-setwd("/Users/DanielAvram/Desktop/TitlingDeforestation")
+# setwd("/Users/DanielAvram/Desktop/TitlingDeforestation")
 
-data <- read.csv("BHM_sample20.csv")
+data <- read.csv("TitlingDeforestation/BHM_sample20.csv")
 #Note: the current sample20 is modified to move first two columns from raw GIS export
 #Note: A352 moved after A460 to match earlier versions and preserve order of columns
 #Note: all NULL changed to NA with find and replace in Excel
