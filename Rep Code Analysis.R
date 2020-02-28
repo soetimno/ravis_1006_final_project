@@ -15,8 +15,18 @@
 ###############################################################################
 ###############################################################################
 
+# TDR: Note that there are a number of comments in the text from the authors 
+# themselves. To differentiate my comments, I will put my initials at the start
+# of the comment block, as I have done here.
+
 ###############################################################################
-###Setting up
+
+# Setting up
+# TDR: Loading the packages. arm is a modeling package, MatchIt is a package 
+# (by Kosuke!) for matching treated-untreated cases for causal inference (we
+# will see below that they use genetic matching), coefplot is for plotting 
+# coefficients, ggplot2 we know well, and rgenoud is for genetic optimization;
+# not sure how it's used here yet. 
 
 require(arm) #Version 1.7-07
 require(MatchIt) #Version 2.4-21
@@ -24,22 +34,33 @@ require(coefplot) #Version 1.2.0
 require(ggplot2) #Version 1.0.1
 require(rgenoud)
 
-
-
+# TDR: I've changed this to work from the repo's top level directory
 
 data <- read.csv("TitlingDeforestation/BHM_sample20.csv")
 
+
+# TDR: these notes are from the author
 # Note: the current sample20 is modified to move first two columns 
 # from raw GIS export
 # Note: A352 moved after A460 to match earlier versions and keep order of cols
 # Note: all NULL changed to NA with find and replace in Excel
 
 ## Treatment variables 
+# TDR: this creates two new variables to indicate treatment. Var A352 indicates
+# intervention year. 0 is no intervention, 2 is 2002, 3 is 2003, etc. Therefore
+# PML indicates whether or not treatment happened at all. PMI indicates whether 
+# or not the intervention occurred in 2003 or later. At least, according to the
+# metadata. In the supporting information, PML indicates parcels that were only
+# given legal tenure, while PMI indicates ones given legal tenure and a 
+# complementary community management plan. Need to clarify. 
 
 data$PML <- ifelse(data$A352 == 0,0,1)
 data$PMI <- ifelse(data$A352 >= 3,1,0) 
 
 # Note: all PSUR intervention had PMI in 2003 and after
+# TDR: Just renaming cols, and then converting the "distance to Peruvian 
+# border" variable from meters to km. The renamed cols are ones corresponding
+# to yearly forest loss data
 
 names(data)[287:298] <- c("fl.2001","fl.2002","fl.2003","fl.2004",
                           "fl.2005","fl.2006", "fl.2007","fl.2008",
@@ -47,6 +68,8 @@ names(data)[287:298] <- c("fl.2001","fl.2002","fl.2003","fl.2004",
 data$toPeru.km <- data$A486 / 1000
 
 # This function remakes the data frame with only specified columns & NAs removed:
+# TDR: this defines a function, make(), which reworks the raw dataframe into a 
+# separate, model-specific one. 
 
 make <- function (data, names) {
   datasub <- as.data.frame(data)
@@ -61,25 +84,49 @@ make <- function (data, names) {
 # Example> make(c(monit2other,sa1all))
 
 ###############################################################################
-# Creating "flat" dataset that allows matching across pre-treatment years
 
+# Creating "flat" dataset that allows matching across pre-treatment years
+# TDR: for roughly the next 100 lines they go over each year in the data (each
+# year is 17 lines) creating a subset and then creating new, year-specific
+# variables. I comment line-by-line for the first year:
+
+# TDR: first, subset/select for observations that either were not treated or
+# were treated in the relevant year (eg 2002)
 wave.2002 <- subset(data, (A352 == 2 | A352 == 0))
+# TDR: new var total deforestation for five years after treatment 
 wave.2002$fl.5yr.postPML <- wave.2002$fl.2003 + wave.2002$fl.2004 + 
                             wave.2002$fl.2005 + wave.2002$fl.2006 + 
                             wave.2002$fl.2007
+# TDR: these rename annual forest loss to a standard form
 wave.2002$fl.yr1 <- wave.2002$fl.2003
 wave.2002$fl.yr2 <- wave.2002$fl.2004
 wave.2002$fl.yr3 <- wave.2002$fl.2005
 wave.2002$fl.yr4 <- wave.2002$fl.2006
 wave.2002$fl.yr5 <- wave.2002$fl.2007
+# TDR: this var captures pre-treatment forest loss
 wave.2002$fl.pre.5cell <- wave.2002$fl.2001 + wave.2002$A393 + 
                           wave.2002$A461
+# TDR: this var is the diff of A408 (area of pixel with forest cover in 2000)
+# and fl.2001, forest loss 
 wave.2002$forest.pre <- wave.2002[, 314] - wave.2002[, 287]
+# TDR: this is "donut population density" from LandScan, a population density
+# dataset made by Oak Ridge Laboratory
 wave.2002$pop.den.1km.pre <- wave.2002$A173
+# TDR: same thing, different res
 wave.2002$pop.den.5km.pre <- wave.2002$A176
+# TDR: ditto
 wave.2002$pop.den.10km.pre <- wave.2002$A174
+# TDR: this var is based on MODIS data (MODIS is a specific sensor carried
+# by a pair of satellites, more information on request). One of the standard
+# products distributed by MODIS is MCD12Q, a land use classification scheme. 
+# They categorize some uses as "disturbed," such as agriculture or built 
+# environment. This var is the distance of a given pixel from a pixel that
+# was disturbed in 2002. 
 wave.2002$dist.disturb.pre <- wave.2002$A116
+# TDR: not sure yet why they need a column of the word two 
 wave.2002$wave = "two"
+# TDR: subsetting the df for pixels with more than 450000m2 of forest and 
+# which had formal land rights by 2008
 wave.2002 <- subset(wave.2002, forest.pre > 450000 & A346 == 0)
 
 wave.2003 <- subset(data,(A352 == 3 | A352 == 0))
