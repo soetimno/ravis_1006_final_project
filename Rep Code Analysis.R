@@ -38,7 +38,6 @@ require(rgenoud)
 
 data <- read.csv("TitlingDeforestation/BHM_sample20.csv")
 
-
 # TDR: these notes are from the author
 # Note: the current sample20 is modified to move first two columns 
 # from raw GIS export
@@ -86,6 +85,7 @@ make <- function (data, names) {
 ###############################################################################
 
 # Creating "flat" dataset that allows matching across pre-treatment years
+
 # TDR: for roughly the next 100 lines they go over each year in the data (each
 # year is 17 lines) creating a subset and then creating new, year-specific
 # variables. I comment line-by-line for the first year:
@@ -219,28 +219,49 @@ wave.2007$dist.disturb.pre <- wave.2007$A121
 wave.2007$wave = "seven"
 wave.2007 <- subset(wave.2007, forest.pre > 450000 & A346 == 0)
 
+# TDR: Now they bind all 6 years into a single tall df—this might explain
+# that last step of making a col with a string "two," "three," etc.
+
 data.flat <- rbind(wave.2002, wave.2003, wave.2004, wave.2005, wave.2006,
                    wave.2007)
+
+# TDR: Finally, create a new id variable from that string variable by pasting 
+# the string to the observation/pixel's objectid
+
 data.flat$id <- paste(data.flat$wave, data.flat$OBJECTID, sep="")
 
 ###############################################################################
 # Figure 4
 
 # Excluding PMI plots from control group
+# TDR: dropping obs of plots given both a legal tenure and a 
+# complementary community management plan.
 
 data.PMLonly.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 0)) 
 
 # Models for PML
+# TDR: standard multiple linear regression, regressing forest loss over five
+# years, in each year, on 12 predictors (the unnamed ones are distance to 
+# electric grid (A128), distance to major river (A129), distance to major
+# roads (A130), whether the land belongs to the indigenous Shuar (A154),
+# whether it has "loose or solid protection" (A347), elevation (A361),
+# and slope (A362)). Then they summarize it.
 
 fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
   pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
-  A130 + A154 + A347 + A361 + A362,data=data.PMLonly.flat)
+  A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
 summary(fig4.a)
 
-make(data.PMLonly.flat, c(fl.5yr.postPML,fl.yr1,fl.yr2,fl.yr3,fl.yr4, 
-  fl.yr5,PML,fl.pre.5cell,forest.pre,
-  pop.den.5km.pre,dist.disturb.pre,A128,A129,
-  A130,A154,A347,A361,A362,id))
+# TDR: here they run their make() function on the PML-only df to produce
+# the input for matching
+
+make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+  fl.yr5, PML, fl.pre.5cell, forest.pre,
+  pop.den.5km.pre, dist.disturb.pre, A128, A129,
+  A130, A154, A347, A361, A362, id))
+
+# TDR: and here they run the matching using a genetic method
+
 out.PMLonly.flat <- matchit(PML ~ fl.pre.5cell + forest.pre + 
   pop.den.5km.pre + dist.disturb.pre +
   A128 + A129 + A130 + A154 + A347 +
@@ -257,10 +278,15 @@ out.PMLonly.flat <- matchit(PML ~ fl.pre.5cell + forest.pre +
 
 summary(out.PMLonly.flat, interactions = T, standardize = T) 
 
+# TDR: Here they are outputting the matched dataset, a week later.
+
 data.PMLonly.flat.matched <- match.data(out.PMLonly.flat)
 
 # Note: data.PMLonly.flat.matched saved as "PMLonly_flat_matched_140414.csv"
 # and available from authors on request
+
+# TDR: Here they are running the regressions to be used on p 40 of their paper,
+# combined as "fig4"
 
 fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
              data = data.PMLonly.flat.matched)
@@ -284,6 +310,9 @@ fig4 + theme_bw(base_size=18)
 
 # Figure 5
 
+# TDR: The next 70 lines or so are very clearly explained in the authors' 
+# comments. The figure produced (p 40 of the paper) shows the effects 
+# of treatment by year
 # Model 1 is year-on-year decomposition of Model (a) in Figure 4
 
 m1.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
@@ -361,6 +390,8 @@ m3.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
 summary(m3.PML5)
 
 ##Year by year effects of PML
+# TDR: here they're building vectors of coefficients and errors of each
+# model run above. 
 
 year <- seq(1:5)
 m1.coef <- c(m1.PML1$coef[2], m1.PML2$coef[2], m1.PML3$coef[2], 
@@ -380,6 +411,8 @@ m3.coef <- c(m3.PML1$coef[2], m3.PML2$coef[2], m3.PML3$coef[2],
 m3.se <- c(coef(summary(m3.PML1))[2, 2], coef(summary(m3.PML2))[2, 2], 
            coef(summary(m3.PML3))[2, 2], coef(summary(m3.PML4))[2, 2], 
            coef(summary(m3.PML5))[2, 2])
+
+# TDR: Plotting
 
 par(mar = c(4.1,5.1,1.1,1.1))
 plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-600, 400), 
@@ -409,6 +442,11 @@ lines(year, m3.coef, type = "l", col = "blue", lwd = 5)
 # Figure 6
 
 # Excluding PML-only plots from control group
+# TDR: Here they're doing the opposite subsetting as they did for figure 4
+# above. They're keeping only obs given both a legal tenure and a 
+# complementary community management plan, and dropping those given only 
+# the former. The sequence here is the same as fig 4; the figure produced 
+# (p 41 of the paper) is like that in figure 4
 
 data.PMI.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 1)) 
 
@@ -466,6 +504,8 @@ fig6 + theme_bw(base_size=18)
 # Figure 7
 
 # Model 1 is year-on-year decomposition of Model (a) in Figure 6
+# TDR: This sequence is the same as figure 5, except for a different set of 
+# treated obs
 
 m1.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
            dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
