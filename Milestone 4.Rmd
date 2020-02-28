@@ -2,7 +2,9 @@
 title: "Milestone 4"
 author: "Tim Ravis"
 date: "2/27/2020"
-output: html_document
+output: pdf_document
+bibliography: biblio.bib
+nocite: "@*"
 ---
 
 ```{r setup, include=FALSE}
@@ -10,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r}
+```{r include = FALSE}
 # You will need to use a variety of more advanced tools in order to create your paper. The single best reference is R Markdown: The Definitive Guide. The purpose of this milestone is to confirm that you know how to use them. The final version of your paper will be a PDF. (Consider using the tinytex package, especially if you are on Windows.) I recommend using the pdf_document2 class which comes with the bookdown package. Show us that you know how to use all the relevant tools by producing a short PDF which contains the following components: a bibliography (and associated references), a footnote, a table (using the gt package), a regression table (using whatever packages you like – options include gtsummary, stargazer, kable/kableExtra, and report). All of this can be brief (i.e., just two entries in the References is fine) and fake (made up data in the tables). We just want to see that you can get things to work. Submit the PDF to Canvas. Include the url for your Github repo in a footnote.
 
 
@@ -18,9 +20,68 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r include = FALSE}
+# load packages
+
 library(stargazer)
 library(kableExtra)
 library(bookdown)
 library(tinytex)
+library(tidyverse)
+library(gtsummary)
+library(gt)
+library(naniar)
+
+# load data—FAO statistics
+
+ms4data <- read_csv("FAO_all-indicators.csv")
+
 ```
+
+This is my Milestone 4 PDF.^[* The repo for my project [can be found here](https://github.com/soetimno/ravis_1006_final_project.git)]
+
+For this PDF, I am using historical data from the Food and Agriculture Organizatio (FAO). 
+
+Here is a table, made with GTSummary, summarizing Indonesia's performance on subset of the variables in this dataset:
+
+```{r echo = FALSE}
+table1 <- ms4data %>%
+  filter(Area == "Indonesia") %>% 
+  select(`Emissions (C02eq) from Agricultural Energy`, 
+         `Agriculture value added per worker (constant 2005 US$)`,
+         `Employment in agriculture`, `Cropland`, `Land under permanent crops`,
+         `Pesticide Use`, `Agricultural tractors`, `Nutrient nitrogen N (total)`,
+         `Nutrient phosphate P2O5 (total)`, `Nutrient potash K2O (total)`,
+         `Export Value`, `Import Value`, `Trade Balance`) %>% 
+  tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})"))
+table1
+```
+
+And for a regression table, I decided to regress agricultural emissions on cropland, export value, pesticide use, tractors, and fertilizers. 
+
+```{r echo = FALSE}
+mssubset <- ms4data %>% 
+  filter(Area == "Indonesia" & Year >= 1999 & Year <= 2010) %>% 
+  replace_with_na_all(condition = ~.x == 0)
+
+fakemod <- lm(`Emissions (C02eq) from Agricultural Energy` ~ 
+              `Cropland` + `Pesticide Use` + `Land under permanent crops` +
+              `Export Value` + `Trade Balance` + 
+              `Agriculture value added per worker (constant 2005 US$)`,
+              data = mssubset)
+
+tbl_regression(fakemod)
+```
+
+# References
+
+
+
+
+
+
+
+
+
+
+
 
