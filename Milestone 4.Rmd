@@ -10,3 +10,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
+```{r}
+# You will need to use a variety of more advanced tools in order to create your paper. The single best reference is R Markdown: The Definitive Guide. The purpose of this milestone is to confirm that you know how to use them. The final version of your paper will be a PDF. (Consider using the tinytex package, especially if you are on Windows.) I recommend using the pdf_document2 class which comes with the bookdown package. Show us that you know how to use all the relevant tools by producing a short PDF which contains the following components: a bibliography (and associated references), a footnote, a table (using the gt package), a regression table (using whatever packages you like – options include gtsummary, stargazer, kable/kableExtra, and report). All of this can be brief (i.e., just two entries in the References is fine) and fake (made up data in the tables). We just want to see that you can get things to work. Submit the PDF to Canvas. Include the url for your Github repo in a footnote.
+
+
+```
+
+
+```{r include = FALSE}
+library(stargazer)
+library(kableExtra)
+library(bookdown)
+library(tinytex)
+```
+
