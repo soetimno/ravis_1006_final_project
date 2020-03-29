@@ -1,0 +1,54 @@
+---
+title: "Milestone 5"
+author: "Tim Ravis"
+date: "3/29/2020"
+output: html_document
+#output: pdf_document
+bibliography: biblio.bib
+nocite: "@*"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r prompt, include = FALSE}
+# All data from your paper must be processed and available in your repo. Submit a PDF via Canvas with the following components, all of which must be present in future submissions:
+# 
+# - A footnote with your repo url and some verbiage about “All analysis for this paper is available . . .”
+# 
+# - A beautiful graphic which uses this data. (May be similar to or different from a graphic in the original paper.) Use King et al (2000) for inspiration. This is the portion of the submission which will be graded most harshly. Make sure that you include a thorough caption.
+# 
+# - A bibliography with at least five references, one of which will be the article you are replicating.
+# 
+# - A 300 – 500 word overview of your replication paper. What analysis did they run? What did they conclude?
+# 
+# - An Appendix which include a replication of at least one of the tables from your paper. (It can be a simple summary table.) Also, take a screen shot of the original table and include that image in your Appendix. We want to see how closely your results match the original paper’s.
+```
+
+```{r load packages and data, include = FALSE}
+# load packages
+
+library(stargazer)
+library(kableExtra)
+library(bookdown)
+library(tinytex)
+library(tidyverse)
+library(gtsummary)
+library(gt)
+library(naniar)
+
+# load data—
+
+raw_data <- read_csv("TitlingDeforestation/BHM_sample20.csv")
+
+```
+
+This is my Milestone 5 PDF.^[* The repo for my project [can be found here](https://github.com/soetimno/ravis_1006_final_project.git)]
+
+## A 300 – 500 word overview of your replication paper. What analysis did they run? What did they conclude?
+
+
+# References
+
+
