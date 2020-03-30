@@ -2,8 +2,8 @@
 title: "Milestone 5"
 author: "Tim Ravis"
 date: "3/29/2020"
-output: html_document
-#output: pdf_document
+#output: html_document
+output: pdf_document
 bibliography: biblio.bib
 nocite: "@*"
 ---
@@ -44,11 +44,54 @@ raw_data <- read_csv("TitlingDeforestation/BHM_sample20.csv")
 
 ```
 
-This is my Milestone 5 PDF.^[* The repo for my project [can be found here](https://github.com/soetimno/ravis_1006_final_project.git)]
+This is my Milestone 5 PDF.^[* All analysis and data for this paper [is available here](https://github.com/soetimno/ravis_1006_final_project.git)]
 
-## A 300 – 500 word overview of your replication paper. What analysis did they run? What did they conclude?
+#### A 300 – 500 word overview of your replication paper. What analysis did they run? What did they conclude?
+
+#### - A beautiful graphic which uses this data. (May be similar to or different from a graphic in the original paper.) Use King et al (2000) for inspiration. This is the portion of the submission which will be graded most harshly. Make sure that you include a thorough caption.
+
+My project's replication paper is titled "Titling community land to prevent deforestation: An evaluation of a best-case program in Morona-Santiago, Ecuador." This is an evaluation of the impact of a donor-funded land titling and land management program for indigenous communities in Ecuador. They believe that this is virtually a best-case policy intervention. The data for the model was generated from spatial data on intervention areas and title boundaries provided by USAID and NGOs and publicly available spatial raster data such as population density (Landscan) and forest cover (Global Forest Change (GFC) by Hansen et al). The change in GFC in an area is used as the metric for deforestation. Areas receiving the program treatment were matched with areas that did not receive the treatment using a genetic matching algorithm. The treatment effect over the five years after is then estimated with a difference-in-difference OLS model. They find that treatment does not have a significant effect on deforestation rates. 
 
 
-# References
+
+
+# References {-}
+
+<div id="refs"></div>
+
+\newpage 
+
+# Appendix {-}
+
+An Appendix which include a replication of at least one of the tables from your paper. (It can be a simple summary table.) Also, take a screen shot of the original table and include that image in your Appendix. We want to see how closely your results match the original paper’s.
+
+```{r appendix table, include = FALSE}
+
+# The only data table in this paper is in the Supporting Information document, 
+# and shows pre- and post-matching balance summaries for the covariates used 
+# in the paper. This uses the matched data produced by the code on lines 265 
+# to 272 of the "Rep Code Analysis.R" file found in this directory of the 
+# repo. However, as noted by the authors in the code immediately following the
+# matching, the matching procedure they used took over a week. So, I contacted
+# Buntaine, a professor at UCSB, to get the matched data (they offer this in
+# the notes). B1 
+
+PML_flat <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+
+PMI_flat <- read_csv("TitlingDeforestation/PMI_flat_matched_140414.csv")
+
+summary(PML_flat, interactions = T, standardize = T) 
+summary(PMI_flat, interactions = T, standardize = T) 
+```
+
+
+
+
+The table that this follows is from page 6 of the Supporting Information document, which can be found in the repo:
+
+![alt text here](replication_table.png)
+
+
+
 
 
