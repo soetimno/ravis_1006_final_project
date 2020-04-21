@@ -1,0 +1,160 @@
+---
+title: "Diff matching algos"
+author: "Tim Ravis"
+date: "4/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages, include = FALSE}
+require(arm) #Version 1.7-07
+require(MatchIt) #Version 2.4-21
+require(coefplot) #Version 1.2.0
+require(ggplot2) #Version 1.0.1
+require(rgenoud)
+require(tidyverse)
+```
+```{r original fig 4}
+data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
+
+fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched)
+
+fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre + 
+             pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched)
+
+fig4 <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                  secret.weapon = TRUE, color = "black")
+
+fig4 + theme_minimal() 
+
+```
+
+```{r fig 4 cem}
+fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+   fl.yr5, PML, fl.pre.5cell, forest.pre,
+   pop.den.5km.pre, dist.disturb.pre, A128, A129,
+   A130, A154, A347, A361, A362, id))
+
+out.PMLonly.flat.cem <- matchit(PML ~ fl.pre.5cell + forest.pre +
+  pop.den.5km.pre + dist.disturb.pre +
+  A128 + A129 + A130 + A154 + A347 +
+  A361 + A362, data = data.make, discard = "control",
+  method = "cem")
+
+data.PMLonly.flat.matched.cem <- match.data(out.PMLonly.flat.cem)
+
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched.cem)
+
+fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell +
+             forest.pre + pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched.cem)
+
+fig4.cem <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                  secret.weapon = TRUE, color = "black")
+
+fig4.cem + theme_minimal() 
+
+```
+
+```{r nearest neighbor}
+fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+   fl.yr5, PML, fl.pre.5cell, forest.pre,
+   pop.den.5km.pre, dist.disturb.pre, A128, A129,
+   A130, A154, A347, A361, A362, id))
+
+out.PMLonly.flat.nn <- matchit(PML ~ fl.pre.5cell + forest.pre +
+  pop.den.5km.pre + dist.disturb.pre +
+  A128 + A129 + A130 + A154 + A347 +
+  A361 + A362, data = data.make, discard = "control",
+  method = "nearest")
+
+data.PMLonly.flat.matched.nn <- match.data(out.PMLonly.flat.nn)
+
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched.nn)
+
+fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell +
+             forest.pre + pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched.nn)
+
+fig4.nn <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                  secret.weapon = TRUE, color = "black")
+
+fig4.nn + theme_minimal() 
+```
+
+```{r}
+fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+# make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+#    fl.yr5, PML, fl.pre.5cell, forest.pre,
+#    pop.den.5km.pre, dist.disturb.pre, A128, A129,
+#    A130, A154, A347, A361, A362, id))
+
+out.PMLonly.flat.optimal <- matchit(PML ~ fl.pre.5cell + forest.pre +
+  pop.den.5km.pre + dist.disturb.pre +
+  A128 + A129 + A130 + A154 + A347 +
+  A361 + A362, data = data.make, discard = "control",
+  method = "optimal")
+
+data.PMLonly.flat.matched.optimal <- match.data(out.PMLonly.flat.optimal)
+
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched.optimal)
+
+fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell +
+             forest.pre + pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched.optimal)
+
+fig4.optimal <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                  secret.weapon = TRUE, color = "black")
+
+fig4.optimal + theme_minimal() 
+```
+

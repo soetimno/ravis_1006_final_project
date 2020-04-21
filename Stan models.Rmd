@@ -1,0 +1,63 @@
+---
+title: "Stan modeling"
+author: "Tim Ravis"
+date: "4/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rstanarm)
+library(ggthemes)
+```
+
+```{r original fig 4 w stan}
+
+# data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
+
+fig4.a.stan <- stan_glm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+# data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+
+fig4.b.stan <- stan_glm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched, refresh = 0)
+
+# note: had to drop A347 from this bc it was constant (0)
+
+fig4.c.stan <- stan_glm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre + 
+             pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched, refresh = 0)
+
+iters <- c(rep("a", 4000), rep("b", 4000), rep("c", 4000))
+```
+``` {r}
+fig4.stan <- cbind((rbind(
+    as.data.frame(fig4.a.stan)[2],
+    as.data.frame(fig4.b.stan)[2],
+    as.data.frame(fig4.c.stan)[2])), iters) 
+
+fig4.stan <- fig4.stan %>% 
+  ggplot(aes(x = as.factor(iters), y = PML)) + 
+  geom_tufteboxplot() +
+  theme_minimal()
+
+fig4.stan
+
+# fig4.stan <- multiplot(fig4.a.stan, fig4.b.stan, fig4.c.stan, 
+#                        coefficients = "PML", 
+#                        names = c("(a)", "(b)", "(c)"), title = NULL,
+#                        ylab = NULL, xlab = expression(paste(
+#                         "Effect on deforestation over 5 years (",
+#                         m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+#                       lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+#                       secret.weapon = TRUE, color = "black")
+# 
+# fig4.stan + theme_minimal() 
+```
+

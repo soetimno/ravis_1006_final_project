@@ -1,0 +1,399 @@
+---
+title: "Milestone-6.5"
+author: "Tim Ravis"
+date: "4/14/2020"
+# output: html_document
+output: pdf_document
+bibliography: biblio.bib
+nocite: "@*"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages and data, include = FALSE}
+# load packages
+
+library(stargazer)
+library(kableExtra)
+library(bookdown)
+library(tinytex)
+library(tidyverse)
+library(gtsummary)
+library(gt)
+library(naniar)
+library(coefplot)
+library(ggExtra)
+library(ggthemes)
+
+# load data—
+
+raw_data <- read_csv("TitlingDeforestation/BHM_sample20.csv")
+
+```
+
+This is my Milestone 6.5 PDF.^[* All analysis and data for this paper [is available here](https://github.com/soetimno/ravis_1006_final_project.git)]
+
+### Introduction
+
+My project's replication paper is titled "Titling community land to prevent deforestation: An evaluation of a best-case program in Morona-Santiago, Ecuador." This is an evaluation of the impact of a donor-funded land titling and land management program for indigenous communities in Ecuador. They believe that this is virtually a best-case policy intervention. The data for the model was generated from spatial data on intervention areas and title boundaries provided by USAID and NGOs and publicly available spatial raster data such as population density (Landscan) and forest cover (Global Forest Change (GFC) by Hansen et al). The change in GFC in an area is used as the metric for deforestation. Areas receiving the program treatment were matched with areas that did not receive the treatment using a genetic matching algorithm. The treatment effect over the five years after is then estimated with a difference-in-difference OLS model. They find that treatment does not have a significant effect on deforestation rates. 
+
+### Clear Replication Statement
+
+I was able to replicate all of the main results in the paper. The only relevant coefficient was the treatment effect, so the authors displayed results using Gelman's secret weapon. I've recreated all four of the figures the authors used to communicate their results. 
+
+Note: the authors do provide supplementary results in the supporting information document. I have left these out, but can replicate them if necessary. One set narrows the observation to include only areas inhabited by the Shaur people, who were the primary target population for the intervention. The main results are substantively unchanged, though the sign switches for the pre-matching regression. Another set uses an alternative measure of land cover as the regressand. Where in the paper they use Hansen et al's global forest cover data, here they use the enhanced vegetation index (EVI), a standard index to evaluate vegetation cover using remote sensing imagery. There are no substantive differences with the main results. Finally, they check whether the distance of plots to the nearby Peruvian border makes a difference; again, the main results are not substantively changed. 
+
+
+\newpage 
+
+# References {-}
+
+<div id="refs"></div>
+
+\newpage 
+
+# Appendix {-}
+
+```{r appendix instructions, include = FALSE}
+# An Appendix in which you replicate all results — or all the important results — from your paper. As with other aspects of this project, the exact requirements will vary across students, depending on the complexity of your replication paper. If you paper only has 3 or 4 tables, we expect you to replicate it all. If it has 50 tables, we do not expect that. Use your best judgment and talk with us. You must replicate any result which you plan to use as the base of your extension.
+```
+
+Since this paper is, in the end, a relatively straightforwardly evaluative difference-in-differences model, the key result is the treatment effect of land tenure legalization. In the paper, this is the only result presented—all of the non-treatment variables in the four main regressions were a non-representative set of observations created to isolate the effect of the treatment variable. In this appendix, I have reproduced the four most important graphics in the paper (figures 4 to 7). 
+
+The first is figure 4 from the paper (this is the same as was produced for Milestone 5). It shows the treatment effect of legalization on the first set of treated plots, i.e. those that received only the PML legalization, without any other community development planning.
+
+```{r figure 4 code, include = FALSE}
+
+# Fig 4 is a version of a boxplot showing the treatment effect (as difference 
+# in differences) of legalization in three models: covariates, no pre-matching;
+# no covariates, pre-matching; covariates, pre-matching.
+
+# Element A just shows the treatment effect before matching. The data for this
+# is produced in the first section of the replication code. I've written that 
+# data out and load it here, then run the model.
+
+data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
+
+fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+# Element B shows the treatment effect with no covariates but a matched 
+# dataset. However, as noted by the authors in the code immediately 
+# following the matching, the matching procedure they used took over a 
+# week. So, I contacted Buntaine, a professor at UCSB, to get the matched
+# data (they offer this in the notes). 
+
+# THIS IS THE MATCHED DATA GIVEN BY BUNTAINE
+
+data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched)
+
+# Element C shows the treatment effect with covariates and a pre-matched
+# dataset. 
+
+fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre + 
+             pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched)
+```
+```{r make figure 4, echo = FALSE}
+
+# generating the figure from the paper using coefplot's multiplot() function
+# I've made it look a little better than the version in the paper
+
+fig4 <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                  secret.weapon = TRUE, color = "black")
+
+fig4 + theme_minimal() 
+```
+
+*Difference in differences over five years for PSUR plots with legalization plan (PML) and title versus non-PSUR plots with no plan or title, 2002–2012. Notes: Figure shows treatment effect of tenure status for models as follows: (a) covariates, no pre-matching; (b) no covariates, pre-matching; (c) covariates, pre-matching.*
+
+<br>
+
+The authors wanted to consider the possibility of variable lag in the effects of land titling on deforestation; they do so by looking at the treatment effects in each year after the PSUR intervention in 2002. The results are largely the same as in the preceding figure: before matching, there appears to be a reduction in deforestation, but after matching the effect disappears. 
+
+```{r figure 5 code, include = FALSE}
+
+# This figure is a year-on-year decomposition of the three models shown in the
+# preceding graphic.
+
+# Model 1 is year-on-year decomposition of Model (a) in Figure 4
+
+m1.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              A362, data = data.PMLonly.flat)
+
+m1.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362,data = data.PMLonly.flat)
+
+m1.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362,data = data.PMLonly.flat)
+
+m1.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362,data = data.PMLonly.flat)
+
+m1.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              A362,data = data.PMLonly.flat)
+
+# Model 2 is year-on-year decomposition of Model (b) in Figure 4
+
+m2.PML1 <- lm(fl.yr1 ~ PML, weights = weights, 
+              data = data.PMLonly.flat.matched)
+
+m2.PML2 <- lm(fl.yr2 ~ PML, weights = weights, 
+              data = data.PMLonly.flat.matched)
+
+m2.PML3 <- lm(fl.yr3 ~ PML, weights = weights,
+              data = data.PMLonly.flat.matched)
+
+m2.PML4 <- lm(fl.yr4 ~ PML, weights = weights,
+              data = data.PMLonly.flat.matched)
+
+m2.PML5 <- lm(fl.yr5 ~ PML,weights = weights, 
+              data = data.PMLonly.flat.matched)
+
+# Model 3 is year-on-year decomposition of Model (c) in Figure 6
+
+m3.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              A362, weights = weights, data = data.PMLonly.flat.matched)
+
+m3.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362, weights = weights, data = data.PMLonly.flat.matched)
+
+m3.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              A362, weights = weights, data = data.PMLonly.flat.matched)
+
+m3.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362, weights = weights, data = data.PMLonly.flat.matched)
+
+m3.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              A362, weights = weights, data = data.PMLonly.flat.matched)
+
+# Year by year effects of PML are broken out. First, build vectors of 
+# coefficients and standard errors for each of the preceding models.
+
+year <- seq(1:5)
+m1.coef <- c(m1.PML1$coef[2], m1.PML2$coef[2], m1.PML3$coef[2], 
+             m1.PML4$coef[2], m1.PML5$coef[2])
+m1.se <- c(coef(summary(m1.PML1))[2, 2], coef(summary(m1.PML2))[2, 2], 
+           coef(summary(m1.PML3))[2, 2], coef(summary(m1.PML4))[2, 2], 
+           coef(summary(m1.PML5))[2, 2])
+
+m2.coef <- c(m2.PML1$coef[2], m2.PML2$coef[2], m2.PML3$coef[2], 
+             m2.PML4$coef[2], m2.PML5$coef[2])
+m2.se <- c(coef(summary(m2.PML1))[2, 2], coef(summary(m2.PML2))[2, 2], 
+           coef(summary(m2.PML3))[2, 2], coef(summary(m2.PML4))[2, 2], 
+           coef(summary(m2.PML5))[2, 2])
+
+m3.coef <- c(m3.PML1$coef[2], m3.PML2$coef[2], m3.PML3$coef[2],
+             m3.PML4$coef[2], m3.PML5$coef[2])
+m3.se <- c(coef(summary(m3.PML1))[2, 2], coef(summary(m3.PML2))[2, 2], 
+           coef(summary(m3.PML3))[2, 2], coef(summary(m3.PML4))[2, 2], 
+           coef(summary(m3.PML5))[2, 2])
+```
+```{r make figure 5, echo = FALSE}
+# Then plot them all in a single graphic. 
+
+par(mar = c(4.1,5.1,1.1,1.1))
+plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-600, 400), 
+     ylab = expression(paste("Effect on Deforestation (",
+                       m^{2} , " per " , km^{2}, ")")), 
+     xlab = "Year", cex.lab = 1, cex.axis = 1)
+abline(h = 0,lty = 2)
+polygon(x=c(year[1:5], year[5:1]), y = c(m1.coef + 2 * m1.se, m1.coef[5:1] - 2
+                                         * m1.se[5:1]), 
+                                         col = rgb(.6, .6, .6, 0.5), 
+                                         border = NA)
+polygon(x=c(year[1:5], year[5:1]), y = c(m2.coef + 2 * m2.se, m2.coef[5:1] - 2
+                                         * m2.se[5:1]), 
+                                         col = rgb(0, 0, 0.8, 0.5), 
+                                         border = NA)
+polygon(x=c(year[1:5], year[5:1]), y = c(m3.coef + 2 * m3.se, m3.coef[5:1] - 2
+                                         * m3.se[5:1]), 
+                                         col = rgb(0, 0, 1, 0.5),
+                                         border = NA)
+lines(year, m1.coef, type = "l", col = "black", lwd = 2)
+lines(year, m2.coef, type = "l", col = "blue", lwd = 2)
+lines(year, m3.coef, type = "l", col = "blue", lwd = 2)
+
+```
+
+*PML-only effects on an annual basis following treatment. The black line/gray error bars are regression without pre-matching; the blue lines and error bars are regression estimates with pre-matching both with (dark blue) and without (light blue) covariates. The error bars show two standard errors.*
+
+<br>
+
+After 2003, the PSUR included an additional set of management and training programming to supplement the legalization process. They run the same analysis for these plots as the legalization-only ones: match, model, decompose, compare. The results are displayed in figures 6 and 7 in the original paper. 
+
+```{r figure 6 code, include = FALSE}
+
+# Fig 6 is a version of a boxplot showing the treatment effect (as difference 
+# in differences) of legalization in three models: covariates, no pre-matching;
+# no covariates, pre-matching; covariates, pre-matching.
+
+# Element A just shows the treatment effect before matching. The data for this
+# is produced in the first section of the replication code. I've written that 
+# data out and load it here, then run the model.
+
+data.PMI.flat <- read_csv("TitlingDeforestation/PMI_prematching.csv")
+
+fig6.a <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre + 
+             pop.den.5km.pre + dist.disturb.pre + A128 + A129 + A130 +
+             A154 + A347 + A361 + A362, data = data.PMI.flat)
+
+# Element B shows the treatment effect with no covariates but a matched 
+# dataset. I load in the matched data provided by the lead author and run
+# the model
+
+data.PMI.flat.matched <- read_csv("TitlingDeforestation/PMI_flat_matched_140414.csv")
+
+fig6.b <- lm(fl.5yr.postPML ~ PMI, weights = weights, 
+             data = data.PMI.flat.matched)
+
+# Element C shows the treatment effect with covariates and a pre-matched
+# dataset. 
+
+fig6.c <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre + 
+             pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+             A130 + A154 + A347 + A361 + A362, weights = weights, 
+             data = data.PMI.flat.matched)
+```
+```{r make figure 6, echo = FALSE}
+
+# generating the figure from the paper using coefplot's multiplot() function
+# I've made it look a little better than the version in the paper
+
+fig6 <- multiplot(fig6.a, fig6.b, fig6.c, coefficients = "PMI", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL, 
+                  ylab = NULL, 
+                  xlab = expression(paste("Effect on deforestation over 5 years (",
+                         m^{2} , " per " , km^{2}, ")")),
+                  pointSize = 3, lwdOuter = 0.5,lwdInner = 1.5,
+                  horizontal = TRUE, secret.weapon = TRUE, color = "black")
+fig6 + theme_minimal()
+```
+
+```{r figure 7 code, include = FALSE}
+
+# This figure is a year-on-year decomposition of the three models shown in the
+# preceding graphic.
+
+m1.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, data = data.PMI.flat)
+
+m1.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, data = data.PMI.flat)
+
+m1.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, data = data.PMI.flat)
+
+m1.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, data = data.PMI.flat)
+
+m1.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, data = data.PMI.flat)
+
+# Model 2 is year-on-year decomposition of Model (b) in Figure 6
+
+m2.1 <- lm(fl.yr1 ~ PMI, weights = weights, data = data.PMI.flat.matched)
+
+m2.2 <- lm(fl.yr2 ~ PMI, weights = weights, data = data.PMI.flat.matched)
+
+m2.3 <- lm(fl.yr3 ~ PMI, weights = weights, data = data.PMI.flat.matched)
+
+m2.4 <- lm(fl.yr4 ~ PMI, weights = weights, data = data.PMI.flat.matched)
+
+m2.5 <- lm(fl.yr5 ~ PMI, weights = weights, data = data.PMI.flat.matched)
+
+# Model 3 is year-on-year decomposition of Model (c) in Figure 6
+
+m3.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, weights=weights,data=data.PMI.flat.matched)
+
+m3.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, weights = weights, data = data.PMI.flat.matched)
+
+m3.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, weights = weights, data = data.PMI.flat.matched)
+
+m3.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+           A362, weights = weights, data = data.PMI.flat.matched)
+
+m3.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           A362, weights = weights, data = data.PMI.flat.matched)
+
+##Year by year effects of PMI
+
+year <- seq(1:5)
+m1.coef <- c(m1.1$coef[2], m1.2$coef[2], m1.3$coef[2], m1.4$coef[2], 
+             m1.5$coef[2])
+m1.se <- c(coef(summary(m1.1))[2, 2], coef(summary(m1.2))[2, 2], 
+           coef(summary(m1.3))[2, 2], coef(summary(m1.4))[2, 2], 
+           coef(summary(m1.5))[2, 2])
+m2.coef <- c(m2.1$coef[2], m2.2$coef[2], m2.3$coef[2], m2.4$coef[2], 
+             m2.5$coef[2])
+m2.se <- c(coef(summary(m2.1))[2, 2], coef(summary(m2.2))[2, 2], 
+           coef(summary(m2.3))[2, 2], coef(summary(m2.4))[2, 2], 
+           coef(summary(m2.5))[2, 2])
+m3.coef <- c(m3.1$coef[2], m3.2$coef[2], m3.3$coef[2], m3.4$coef[2],
+             m3.5$coef[2])
+m3.se <- c(coef(summary(m3.1))[2, 2], coef(summary(m3.2))[2, 2], 
+           coef(summary(m3.3))[2, 2], coef(summary(m3.4))[2, 2], 
+           coef(summary(m3.5))[2, 2])
+```
+```{r make figure 7, echo = FALSE}
+
+par(mar = c(4.1, 5.1, 1.1,1.1))
+plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-500, 400), 
+     ylab = expression(paste("Effect on Deforestation (", m^{2} , 
+                             " per ", km^{2}, ")")), 
+     xlab = "Year", cex.lab = 1, cex.axis = 1)
+abline(h = 0, lty = 2)
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m1.coef + 2 * m1.se, m1.coef[5:1] - 2 * m1.se[5:1]),
+        col = rgb(.6, .6, .6, 0.5), border = NA)
+polygon(x = c(year[1:5], year[5:1]), 
+        y = c(m2.coef + 2 * m2.se, m2.coef[5:1] - 2 * m2.se[5:1]), 
+        col = rgb(0, 0, 0.8, 0.5), border = NA)
+polygon(x = c(year[1:5], year[5:1]), 
+        y = c(m3.coef + 2 * m3.se, m3.coef[5:1] - 2 * m3.se[5:1]), 
+        col = rgb(0, 0, 1, 0.5), border = NA)
+lines(year, m1.coef, type = "l", col = "black", lwd = 3)
+lines(year, m2.coef, type = "l", col = "blue", lwd =  3)
+lines(year, m3.coef, type = "l", col = "blue", lwd = 3)
+
+```
+
+
+
+
+
