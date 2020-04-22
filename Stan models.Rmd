@@ -34,9 +34,11 @@ fig4.c.stan <- stan_glm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
              A128 + A129 + A130 + A154 + A361 + A362, 
              weights = weights, data = data.PMLonly.flat.matched, refresh = 0)
 
-iters <- c(rep("a", 4000), rep("b", 4000), rep("c", 4000))
+
 ```
 ``` {r}
+iters <- c(rep("a", 4000), rep("b", 4000), rep("c", 4000))
+
 fig4.stan <- cbind((rbind(
     as.data.frame(fig4.a.stan)[2],
     as.data.frame(fig4.b.stan)[2],

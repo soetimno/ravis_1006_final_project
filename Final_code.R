@@ -98,15 +98,21 @@ wave.2002 <- subset(data, (A352 == 2 | A352 == 0))
 wave.2002$fl.5yr.postPML <- wave.2002$fl.2003 + wave.2002$fl.2004 + 
                             wave.2002$fl.2005 + wave.2002$fl.2006 + 
                             wave.2002$fl.2007
+
 # TDR: these rename annual forest loss to a standard form
 wave.2002$fl.yr1 <- wave.2002$fl.2003
 wave.2002$fl.yr2 <- wave.2002$fl.2004
 wave.2002$fl.yr3 <- wave.2002$fl.2005
 wave.2002$fl.yr4 <- wave.2002$fl.2006
 wave.2002$fl.yr5 <- wave.2002$fl.2007
-# TDR: this var captures pre-treatment forest loss
+
+#############################################
+# TDR: this var captures pre-treatment forest loss.
+# Done by adding one pixel loss to 3 and 5 sq pixel focal means.
 wave.2002$fl.pre.5cell <- wave.2002$fl.2001 + wave.2002$A393 + 
                           wave.2002$A461
+#############################################
+
 # TDR: this var is the diff of A408 (area of pixel with forest cover in 2000)
 # and fl.2001, forest loss 
 wave.2002$forest.pre <- wave.2002[, 314] - wave.2002[, 287]

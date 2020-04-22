@@ -18,13 +18,13 @@ require(rgenoud)
 require(tidyverse)
 ```
 ```{r original fig 4}
-data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
+# data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
 
 fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
                pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
                A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
 
-data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+# data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
 
 fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
              data = data.PMLonly.flat.matched)
@@ -121,7 +121,7 @@ fig4.nn <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML",
 fig4.nn + theme_minimal() 
 ```
 
-```{r}
+```{r optimal}
 fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
                pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
                A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
@@ -135,7 +135,7 @@ out.PMLonly.flat.optimal <- matchit(PML ~ fl.pre.5cell + forest.pre +
   pop.den.5km.pre + dist.disturb.pre +
   A128 + A129 + A130 + A154 + A347 +
   A361 + A362, data = data.make, discard = "control",
-  method = "optimal")
+  method = "optimal", ratio = 2)
 
 data.PMLonly.flat.matched.optimal <- match.data(out.PMLonly.flat.optimal)
 
@@ -158,3 +158,39 @@ fig4.optimal <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML",
 fig4.optimal + theme_minimal() 
 ```
 
+```{r exact}
+fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+# make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+#    fl.yr5, PML, fl.pre.5cell, forest.pre,
+#    pop.den.5km.pre, dist.disturb.pre, A128, A129,
+#    A130, A154, A347, A361, A362, id))
+
+out.PMLonly.flat.exact <- matchit(PML ~ fl.pre.5cell + forest.pre +
+  pop.den.5km.pre + dist.disturb.pre +
+  A128 + A129 + A130 + A154 + A347 +
+  A361 + A362, data = data.make, discard = "control",
+  method = "exact")
+
+data.PMLonly.flat.matched.exact <- match.data(out.PMLonly.flat.exact)
+
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+             data = data.PMLonly.flat.matched.exact)
+
+fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell +
+             forest.pre + pop.den.5km.pre + dist.disturb.pre + 
+             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             weights = weights, data = data.PMLonly.flat.matched.exact)
+
+fig4.exact <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                  secret.weapon = TRUE, color = "black")
+
+fig4.exact + theme_minimal() 
+```
