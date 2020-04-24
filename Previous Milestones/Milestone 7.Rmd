@@ -1,9 +1,9 @@
 ---
-title: "Replication of *Titling community land to prevent deforestation: An evaluation of a best-case program in Morona-Santiago, Ecuador*"
-author: "Tim Ravis"
-date: "4/16/2020"
-output: html_document
-# output: pdf_document
+title: 'Replication of "Titling community land to prevent deforestation: An evaluation of a best-case program in Morona-Santiago, Ecuador"'
+author: "Timothy Ravis"
+date: "April 2020"
+# output: html_document
+output: pdf_document
 bibliography: biblio.bib
 nocite: "@*"
 ---
@@ -36,31 +36,36 @@ raw_data <- read_csv("TitlingDeforestation/BHM_sample20.csv")
 ```
 
 ### Abstract^[* All analysis and data for this paper [is available here](https://github.com/soetimno/ravis_1006_final_project.git)]
-Buntaine, et al (2015) find that donor-financed, government-implemented land tenure legalization efforts in forested areas have a negligible effect on the rate of deforestation versus that found in areas not subject to such an intervention. The major results of their analysis was successfully replicated in this study.
-
-What did I do?
-What did I find?
-
-The fifth sentence is more open-ended. Why does what you found matter? Why should we care?
+Buntaine, et al (2015) find that donor-financed, government-implemented land tenure legalization efforts in forested areas have a negligible effect on the rate of deforestation versus that found in areas not subject to such an intervention. The major results of their analysis was successfully replicated in this study. In the present paper, I explore how spatial autocorrelation in both the treatment and the outcome affects the treatment effect found by the original authors. *I found that...* This illustrates the importance of including spatial relationships into models attempting to explain causality within explicitly spatial datasets. 
 
 \newpage
 
 ### Introduction
 
-*One para for each sentence in the intro.*sa
+*One para for each sentence in the intro.*
 
 "Titling community land to prevent deforestation: An evaluation of a best-case program in Morona-Santiago, Ecuador" (Buntaine, et al 2015) is an evaluation of the impact of a donor-funded land titling and land management program for indigenous communities in Ecuador. They believe that this is virtually a best-case policy intervention. The data for the model was generated from spatial data on intervention areas and title boundaries provided by USAID and NGOs and publicly available spatial raster data such as population density (Landscan) and forest cover (Global Forest Change (GFC) by Hansen et al). The change in GFC in an area is used as the metric for deforestation. Areas receiving the program treatment were matched with areas that did not receive the treatment using a genetic matching algorithm. The treatment effect over the five years after is then estimated with a difference-in-difference OLS model. They find that treatment does not have a significant effect on deforestation rates.
 
 
 \newpage
 
-# References {-}
+### Literature Review
+
+### Paper Review
+
+### Replication
+
+### Extension
+
+### Conclusion
+
+### References {-}
 
 <div id="refs"></div>
 
 \newpage
 
-# Appendix {-}
+### Appendix {-}
 
 Since this paper is, in the end, a relatively straightforwardly evaluative difference-in-differences model, the key result is the treatment effect of land tenure legalization. In the paper, this is the only result presented—all of the non-treatment variables in the four main regressions were a non-representative set of observations created to isolate the effect of the treatment variable. In this appendix, I have reproduced the four most important graphics in the paper (figures 4 to 7).
 
@@ -78,7 +83,15 @@ The first is figure 4 from the paper (this is the same as was produced for Miles
 
 data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
 
-fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+# add logs of outcome and pre-treatment
+data.PMLonly.flat <- data.PMLonly.flat %>% 
+        mutate(logged_fl.5yr.postPML = log(fl.5yr.postPML)) %>% 
+        mutate(logged_fl.pre.5cell= log(fl.pre.5cell))
+
+data.PMLonly.flat <- data.PMLonly.flat %>% drop_na(logged_fl.5yr.postPML)
+
+
+fig4.a <- lm(logged_fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
                pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
                A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
 
@@ -91,6 +104,14 @@ fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
 # THIS IS THE MATCHED DATA GIVEN BY BUNTAINE
 
 data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+
+
+# add logs of outcome and pre-treatment
+data.PMLonly.flat.matched <- data.PMLonly.flat.matched %>% 
+        mutate(logged_fl.5yr.postPML = log(fl.5yr.postPML)) %>% 
+        mutate(logged_fl.pre.5cell= log(fl.pre.5cell)) %>% 
+        drop_na(logged_fl.5yr.postPML)
+
 
 fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights,
              data = data.PMLonly.flat.matched)
@@ -394,7 +415,7 @@ lines(year, m2.coef, type = "l", col = "blue", lwd =  3)
 lines(year, m3.coef, type = "l", col = "blue", lwd = 3)
 
 ```
-# Appendix: All code for this report
+### Appendix: All code for this report
 
 ```{r ref.label = knitr::all_labels(), echo = TRUE, eval = FALSE}
 ```
