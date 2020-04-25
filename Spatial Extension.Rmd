@@ -1,0 +1,142 @@
+---
+title: "Spatial Extension"
+author: "Tim Ravis"
+date: "4/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include = FALSE}
+require(tidyverse)
+require(sf)
+require(spdep)
+```
+
+```{r import & viz as spatial data, include = FALSE}
+
+# stacking the matched dfs
+# data.PMI.flat.matched <- data.PMI.flat.matched %>% 
+#   mutate(treatment = PMI) %>% # create a common treatment col for rbind
+#   mutate(dataset = "PMI") %>% # create col to identify which dataset it is
+#   select(-PMI) # drop the original treatment col for rbind
+
+# converted the data to geojson using QGIS to give it geometry; import it 
+# import data using sf package
+
+# spatial_PMI <- st_read("TitlingDeforestation/spatial_PMI.geojson")
+# # EPSG:4326 - WGS 84 - Geographic
+# spatial_PML <- st_read("TitlingDeforestation/spatial_PML.geojson")
+# #EPSG:4326 - WGS 84 - Geographic
+
+# convert the matched csv to sf using sf package
+
+spatial_PMI <- st_as_sf(data.PMI.flat.matched, 
+                        coords = c("long", "lat")) 
+                        
+spatial_PML <- st_as_sf(data.PMLonly.flat.matched, 
+                        coords = c("long", "lat")) 
+
+# visualizing spatial autocorrelation of outcome pre-treatment each matched set
+
+plot(spatial_PML["fl.pre.5cell"], axes = TRUE, pch = 20, breaks = "jenks")
+#plot(st_geometry(spatial_PML))
+plot(spatial_PMI["fl.pre.5cell"], axes = TRUE, pch = 20, breaks = "jenks")
+```
+
+```{r}
+
+# create adjacency matrices
+
+knn_PML <- knearneigh(spatial_PML, k = 6, longlat = TRUE)
+knn_PMI <- knearneigh(spatial_PMI, k = 6, longlat = TRUE)
+
+neighborhood_PML <- knn2nb(knn_PML)
+neighborhood_PMI <- knn2nb(knn_PMI)
+
+########
+# Plot one for example?
+########
+# coords <- st_coordinates(spatial_PML)
+# plot(spatial_PML, border='gray')
+# plot(neighborhood_PML, coords, col='red', lwd=1, add=TRUE)
+
+
+# Convert to row-standardized adjacency weight list.
+
+w_list_PML <- nb2listw(neighbours = neighborhood_PML, style = 'W')
+w_list_PMI <- nb2listw(neighbours = neighborhood_PMI, style = 'W')
+
+# calculate moran's I
+
+PML_global_moran <- moran.test(x = spatial_PML$fl.pre.5cell, 
+                           listw = w_list_PML)
+PMI_global_moran <- moran.test(x = spatial_PMI$fl.pre.5cell, 
+                           listw = w_list_PMI)
+
+# moran plots
+
+moran.plot(spatial_PML$fl.pre.5cell, w_list_PML)
+moran.plot(spatial_PMI$fl.pre.5cell, w_list_PMI)
+
+# moran mc
+
+PML_mc <- moran.mc(spatial_PML$fl.pre.5cell, w_list_PML, nsim = 4000)
+hist(PML_mc$res)
+abline(v = PML_global_moran[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+
+PMI_mc <- moran.mc(spatial_PMI$fl.pre.5cell, w_list_PMI, nsim = 4000)
+hist(PMI_mc$res)
+abline(v = PMI_global_moran[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+```
+
+```{r applying LISA, echo = FALSE}
+
+g_PML <- localG(as.numeric(spatial_PML$fl.pre.5cell), 
+                listw = w_list_PML,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+g_PMI <- localG(as.numeric(spatial_PMI$fl.pre.5cell), 
+                listw = w_list_PMI,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+
+spatial_PML$g <- attr(g_PML, 'internals')[,1]
+spatial_PMI$g <- attr(g_PMI, 'internals')[,1]
+
+plot(spatial_PML['g'], axes = TRUE, pch = 20, breaks = "jenks")
+
+```
+
+```{r retrying fig 4!!, echo = FALSE}
+
+fig4.a.lisa <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
+               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+
+fig4.b.lisa <- lm(fl.5yr.postPML ~ PML, weights = weights,
+             data = spatial_PML)
+
+fig4.c.lisa <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+             pop.den.5km.pre + dist.disturb.pre +
+             A128 + A129 + A130 + A154 + A347 + A361 + A362 + g,
+             weights = weights, data = spatial_PML)
+
+```
+```{r make original figure 4, echo = FALSE}
+
+# generating the figure from the paper using coefplot's multiplot() function
+# I've made it look a little better than the version in the paper
+
+fig4.lisa <- multiplot(fig4.a.lisa, fig4.b.lisa, fig4.c.lisa, coefficients = "PML",
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3,
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE,
+                  secret.weapon = TRUE, color = "black")
+
+fig4.lisa + theme_minimal()
+```

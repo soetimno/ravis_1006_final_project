@@ -1,0 +1,42 @@
+---
+title: "Re-matching"
+author: "Tim Ravis"
+date: "4/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup}
+
+library(tidyverse)
+library(coefplot)
+library(MatchIt)
+
+# make() for prepping data to be matched
+
+make <- function (data, names) {
+  datasub <- as.data.frame(data)
+  sub = substitute(names)
+  names <- as.character(sub)
+  data.make <- subset(datasub,select = names(datasub) %in% names)
+  data.make <<- na.omit(data.make)
+  data.make <- na.omit(data.make)
+  print(c("ob =",nrow(data.make)),quote=F)
+}
+
+
+
+```
+
+
+```{r PML, echo = FALSE}
+
+data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
+
+
+
+```
+
