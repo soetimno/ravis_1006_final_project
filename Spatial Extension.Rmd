@@ -2,7 +2,7 @@
 title: "Spatial Extension"
 author: "Tim Ravis"
 date: "4/21/2020"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -13,124 +13,354 @@ knitr::opts_chunk$set(echo = TRUE)
 require(tidyverse)
 require(sf)
 require(spdep)
+require(coefplot)
+require(leaflet)
+require(rlist)
+require(huxtable)
 ```
 
-```{r import & viz as spatial data, include = FALSE}
+```{r load data, include = FALSE}
+# load data—raw, pre-matching, matched (from paper)
 
-# stacking the matched dfs
-# data.PMI.flat.matched <- data.PMI.flat.matched %>% 
-#   mutate(treatment = PMI) %>% # create a common treatment col for rbind
-#   mutate(dataset = "PMI") %>% # create col to identify which dataset it is
-#   select(-PMI) # drop the original treatment col for rbind
+raw_data <- read_csv("TitlingDeforestation/BHM_sample20.csv")
+data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
+data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched_140414.csv")
+data.PMI.flat <- read_csv("TitlingDeforestation/PMI_prematching.csv")
+data.PMI.flat.matched <- read_csv("TitlingDeforestation/PMI_flat_matched_140414.csv")
 
-# converted the data to geojson using QGIS to give it geometry; import it 
-# import data using sf package
+```
+#### Introducing Spatial Autocorrelation
 
-# spatial_PMI <- st_read("TitlingDeforestation/spatial_PMI.geojson")
-# # EPSG:4326 - WGS 84 - Geographic
-# spatial_PML <- st_read("TitlingDeforestation/spatial_PML.geojson")
-# #EPSG:4326 - WGS 84 - Geographic
+*Everything is related to everything else, but near things are more related than distant things.* Tobler's First Law of Geography [-@Tobler]
+
+Show it visually in the data on treatment, outcome, and pre-treatment
+Global measure--Moran
+- discuss weights, note that using a distance neighborhood rather than a knn
+
+#### Intro LISA 
+getis ord
+Show it on at least pre-treatment (outcome? (interaction of two?) treatment?)
+
+*Show how it affects the models with the data provided by the paper
+
+*Explain may be misleading bc panel spatial data, rematch only for year one
+Show distribution of years in matched datasets too
+How are models affected?
+
+
+
+Can I rematch for only year one and total loss over five years?
+Can i drop correlated vars from the models when replacing w g?
+Can i do a 
+
+
+
+```{r import & viz as spatial data, echo = FALSE}
 
 # convert the matched csv to sf using sf package
 
-spatial_PMI <- st_as_sf(data.PMI.flat.matched, 
-                        coords = c("long", "lat")) 
+spatial_PMI_matched <- st_as_sf(data.PMI.flat.matched, 
+                        coords = c("long", "lat"), crs = 4326) 
+
+spatial_PMI_prematch<- st_as_sf(data.PMI.flat, 
+                        coords = c("LONG", "LAT"), crs = 4326) 
                         
-spatial_PML <- st_as_sf(data.PMLonly.flat.matched, 
-                        coords = c("long", "lat")) 
+spatial_PML_matched <- st_as_sf(data.PMLonly.flat.matched, 
+                        coords = c("long", "lat"), crs = 4326) 
+
+spatial_PML_prematch <- st_as_sf(data.PMLonly.flat, 
+                        coords = c("LONG", "LAT"), crs = 4326)
 
 # visualizing spatial autocorrelation of outcome pre-treatment each matched set
 
-plot(spatial_PML["fl.pre.5cell"], axes = TRUE, pch = 20, breaks = "jenks")
-#plot(st_geometry(spatial_PML))
-plot(spatial_PMI["fl.pre.5cell"], axes = TRUE, pch = 20, breaks = "jenks")
+plot(spatial_PML_matched["fl.pre.5cell"], axes = TRUE, pch = 20, cex = 0.1, breaks = "kmeans")
+plot(spatial_PML_matched["fl.5yr.postPML"], axes = TRUE, pch = 20, cex = 0.1, breaks = "kmeans")
+plot(spatial_PML_matched["PML"], axes = TRUE, pch = 20, cex = 0.1)
+
+plot(spatial_PMI_matched["fl.pre.5cell"], axes = TRUE, pch = 20, cex = 0.1, breaks = "kmeans")
+plot(spatial_PMI_matched["fl.5yr.postPML"], axes = TRUE, pch = 20, cex = 0.1, breaks = "kmeans")
+plot(spatial_PMI_matched["PMI"], axes = TRUE, pch = 20, cex = 0.1)
+
 ```
 
-```{r}
-
-# create adjacency matrices
-
-knn_PML <- knearneigh(spatial_PML, k = 6, longlat = TRUE)
-knn_PMI <- knearneigh(spatial_PMI, k = 6, longlat = TRUE)
-
-neighborhood_PML <- knn2nb(knn_PML)
-neighborhood_PMI <- knn2nb(knn_PMI)
-
-########
-# Plot one for example?
-########
-# coords <- st_coordinates(spatial_PML)
-# plot(spatial_PML, border='gray')
-# plot(neighborhood_PML, coords, col='red', lwd=1, add=TRUE)
-
-
-# Convert to row-standardized adjacency weight list.
-
-w_list_PML <- nb2listw(neighbours = neighborhood_PML, style = 'W')
-w_list_PMI <- nb2listw(neighbours = neighborhood_PMI, style = 'W')
-
-# calculate moran's I
-
-PML_global_moran <- moran.test(x = spatial_PML$fl.pre.5cell, 
-                           listw = w_list_PML)
-PMI_global_moran <- moran.test(x = spatial_PMI$fl.pre.5cell, 
-                           listw = w_list_PMI)
-
-# moran plots
-
-moran.plot(spatial_PML$fl.pre.5cell, w_list_PML)
-moran.plot(spatial_PMI$fl.pre.5cell, w_list_PMI)
-
-# moran mc
-
-PML_mc <- moran.mc(spatial_PML$fl.pre.5cell, w_list_PML, nsim = 4000)
-hist(PML_mc$res)
-abline(v = PML_global_moran[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
-
-PMI_mc <- moran.mc(spatial_PMI$fl.pre.5cell, w_list_PMI, nsim = 4000)
-hist(PMI_mc$res)
-abline(v = PMI_global_moran[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+```{r leaflet, include = TRUE}
+#pal <- colorBin("magma", domain = spatial_PML_matched$fl.pre.5cell, bins = 10)
+pal <- colorBin("magma", domain = spatial_PML_matched$nbsize, bins = 10)
+#pal <- colorQuantile("magma", domain = spatial_PML_matched$fl.pre.5cell)
+leaflet(st_transform(spatial_PML_matched, 4326)) %>%
+  setView(-77.93, -2.82, 8) %>%
+  addProviderTiles("Stamen.Toner") %>%
+  addCircleMarkers(fillColor = ~pal(nbsize), 
+                   stroke = FALSE,
+                   radius = 3,
+                   fillOpacity = 1) %>%
+  addLegend(
+    pal = pal, 
+    values = ~nbsize, 
+    opacity = 1,
+    title = NULL,
+    position = "bottomright")
 ```
 
-```{r applying LISA, echo = FALSE}
+```{r echo = FALSE}
 
-g_PML <- localG(as.numeric(spatial_PML$fl.pre.5cell), 
-                listw = w_list_PML,
+# create neighborhood--list of vectors, each containing the set of points 
+# that fall within certain radius of a given point
+
+d_PML_matched <- dnearneigh(spatial_PML_matched, 0, 10)
+d_PMI_matched <- dnearneigh(spatial_PMI_matched, 0, 10)
+
+d_PML_prematch <- dnearneigh(spatial_PML_prematch, 0, 10)
+d_PMI_prematch <- dnearneigh(spatial_PMI_prematch, 0, 10)
+
+# distance has edge effects...control for number in neighborhood?
+# drop observations with a neighborhood that's only overlapping obs
+# first attach to the spatial datasets, select only rows w nb > 4)
+
+spatial_PML_matched <- spatial_PML_matched %>% 
+  mutate(nbsize = sapply(d_PML_matched, length)) %>% 
+  filter(nbsize > 4)
+spatial_PMI_matched <- spatial_PMI_matched %>% 
+  mutate(nbsize = sapply(d_PMI_matched, length)) %>% 
+  filter(nbsize > 4)
+
+spatial_PML_prematch <- spatial_PML_prematch %>% 
+  mutate(nbsize = sapply(d_PML_prematch, length)) %>% 
+  filter(nbsize > 4)
+spatial_PMI_prematch <- spatial_PMI_prematch %>% 
+  mutate(nbsize = sapply(d_PMI_prematch, length)) %>% 
+  filter(nbsize > 4)
+
+# then drop zero lengths fron the nb object
+
+d_PML_matched <- subset.nb(d_PML_matched, sapply(d_PML_matched, length) > 4)
+d_PMI_matched <- subset.nb(d_PMI_matched, sapply(d_PMI_matched, length) > 4)
+
+d_PML_prematch <- subset.nb(d_PML_prematch, sapply(d_PML_prematch, length) > 4)
+d_PMI_prematch <- subset.nb(d_PMI_prematch, sapply(d_PMI_prematch, length) > 4)
+
+# Convert neighborhood to weight list.
+
+w_list_PML_matched_d <- nb2listw(neighbours = d_PML_matched, style = 'W')
+w_list_PMI_matched_d <- nb2listw(neighbours = d_PMI_matched, style = 'W')
+
+w_list_PML_prematch_d <- nb2listw(neighbours = d_PML_prematch, style = 'W')
+w_list_PMI_prematch_d <- nb2listw(neighbours = d_PMI_prematch, style = 'W')
+
+```
+
+```{r moran's i stuff, include = FALSE}
+
+# calculate moran's I for each variable
+
+PML_global_moran_pre <- moran.test(x = spatial_PML_matched$fl.pre.5cell,
+                           listw = w_list_PML_matched_d)
+PML_global_moran_treat <- moran.test(x = spatial_PML_matched$PML,
+                           listw = w_list_PML_matched_d)
+PML_global_moran_outcome <- moran.test(x = spatial_PML_matched$fl.5yr.postPML,
+                           listw = w_list_PML_matched_d)
+
+PMI_global_moran_pre <- moran.test(x = spatial_PMI_matched$fl.pre.5cell, 
+                           listw = w_list_PMI_matched_d)
+PMI_global_moran_treat <- moran.test(x = spatial_PMI_matched$PMI,
+                           listw = w_list_PMI_matched_d)
+PMI_global_moran_outcome <- moran.test(x = spatial_PMI_matched$fl.5yr.postPML,
+                           listw = w_list_PMI_matched_d)
+
+# moran plots PML
+
+moran.plot(spatial_PML_matched$fl.pre.5cell, w_list_PML_matched_d)
+moran.plot(spatial_PML_matched$PML, w_list_PML_matched_d)
+moran.plot(spatial_PML_matched$fl.5yr.postPML, w_list_PML_matched_d)
+
+# moran plots PMI
+
+moran.plot(spatial_PMI_matched$fl.pre.5cell, w_list_PMI_matched_d)
+moran.plot(spatial_PMI_matched$PMI, w_list_PMI_matched_d)
+moran.plot(spatial_PMI_matched$fl.5yr.postPML, w_list_PMI_matched_d)
+
+# moran mc PML
+
+PML_mc_pre <- moran.mc(spatial_PML_matched$fl.pre.5cell, w_list_PML_matched_d, nsim = 4000)
+hist(PML_mc_pre$res)
+abline(v = PML_global_moran_pre[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+
+PML_mc_treat <- moran.mc(spatial_PML_matched$PML, w_list_PML_matched_d, nsim = 4000)
+hist(PML_mc_treat$res)
+abline(v = PML_global_moran_treat[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+
+PML_mc_outcome <- moran.mc(spatial_PML_matched$fl.5yr.postPML, w_list_PML_matched_d, nsim = 4000)
+hist(PML_mc_outcome$res)
+abline(v = PML_global_moran_outcome[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+
+# moran mc PMI
+
+PMI_mc_pre <- moran.mc(spatial_PMI_matched$fl.pre.5cell, w_list_PMI_matched_d, nsim = 4000)
+hist(PMI_mc_pre$res)
+abline(v = PMI_global_moran_pre[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+
+PMI_mc_treat <- moran.mc(spatial_PMI_matched$PMI, w_list_PMI_matched_d, nsim = 4000)
+hist(PMI_mc_treat$res)
+abline(v = PMI_global_moran_treat[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+
+PMI_mc_outcome <- moran.mc(spatial_PMI_matched$fl.5yr.postPML, w_list_PMI_matched_d, nsim = 4000)
+hist(PMI_mc_outcome$res)
+abline(v = PMI_global_moran_outcome[['estimate']]['Moran I statistic'], col = 'red', lwd = 2)
+```
+
+```{r applying LISA w distance weights, fig.cap= "Local Getis-Ord values", echo = FALSE}
+
+
+## matched PML getis ord
+
+# pre treatment
+g_PML_matched_pre_d <- localG(as.numeric(spatial_PML_matched$fl.pre.5cell), 
+                listw = w_list_PML_matched_d,
                 zero.policy = FALSE,
                 return_internals = TRUE)
-g_PMI <- localG(as.numeric(spatial_PMI$fl.pre.5cell), 
-                listw = w_list_PMI,
+# treatment
+g_PML_matched_treat_d <- localG(as.numeric(spatial_PML_matched$PML), 
+                listw = w_list_PML_matched_d,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+# outcome
+g_PML_matched_outcome_d <- localG(as.numeric(spatial_PML_matched$fl.5yr.postPML), 
+                listw = w_list_PML_matched_d,
                 zero.policy = FALSE,
                 return_internals = TRUE)
 
-spatial_PML$g <- attr(g_PML, 'internals')[,1]
-spatial_PMI$g <- attr(g_PMI, 'internals')[,1]
+## matched PMI getis ord
 
-plot(spatial_PML['g'], axes = TRUE, pch = 20, breaks = "jenks")
+# pre treatment
+g_PMI_matched_pre_d <- localG(as.numeric(spatial_PMI_matched$fl.pre.5cell), 
+                listw = w_list_PMI_matched_d,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+
+
+## prematched PML getis ord
+
+# pre treatment
+g_PML_prematch_pre_d <- localG(as.numeric(spatial_PML_prematch$fl.pre.5cell), 
+                listw = w_list_PML_prematch_d,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+
+
+## prematched PMI getis ord
+
+# pre treatment
+g_PMI_prematch_pre_d <- localG(as.numeric(spatial_PMI_prematch$fl.pre.5cell), 
+                listw = w_list_PMI_prematch_d,
+                zero.policy = FALSE,
+                return_internals = TRUE)
 
 ```
 
-```{r retrying fig 4!!, echo = FALSE}
+```{r visualizing the g values, echo = FALSE}
 
-fig4.a.lisa <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+# attaching matched g values to PML dataset
+
+spatial_PML_matched$gpre <- attr(g_PML_matched_pre_d, 'internals')[,1]
+spatial_PML_matched$gtreat <- attr(g_PML_matched_treat_d, 'internals')[,1]
+spatial_PML_matched$goutcome <- attr(g_PML_matched_outcome_d, 'internals')[,1]
+
+# attaching matched g values to PMI dataset
+
+spatial_PMI_matched$gpre <- attr(g_PMI_matched_pre_d, 'internals')[,1]
+
+# attaching prematched g values to PML dataset
+
+spatial_PML_prematch$gpre <- attr(g_PML_prematch_pre_d, 'internals')[,1]
+
+# attaching prematched g values to PMI dataset
+
+spatial_PMI_prematch$gpre <- attr(g_PMI_prematch_pre_d, 'internals')[,1]
+
+plot(spatial_PML_matched['nbsize'], axes = TRUE, pch = 20, cex = 0.1, breaks = "jenks")
+plot(spatial_PML_matched['gpre'], axes = TRUE, pch = 20, cex = 0.1, breaks = "jenks")
+plot(spatial_PML_matched['gtreat'], axes = TRUE, pch = 20, cex = 0.1, breaks = "jenks")
+plot(spatial_PML_matched['goutcome'], axes = TRUE, pch = 20, cex = 0.1, breaks = "jenks")
+```
+
+
+```{r storing knn weight stuff, include = FALSE}
+
+# create adjacency matrices; first, a matrix with the indices of points
+# belonging to the set of the k nearest neighbors of each other. 
+
+knn_PML_matched <- knearneigh(spatial_PML_matched, k = 6, longlat = TRUE)
+knn_PML_prematch <- knearneigh(spatial_PML_prematch, k = 6, longlat = TRUE)
+knn_PMI_matched <- knearneigh(spatial_PMI_matched, k = 6, longlat = TRUE)
+knn_PMI_prematch <- knearneigh(spatial_PMI_prematch, k = 6, longlat = TRUE)
+
+# making neighborhoods
+
+neighborhood_PML_matched <- knn2nb(knn_PML_matched)
+neighborhood_PML_prematch <- knn2nb(knn_PML_prematch)
+neighborhood_PMI_matched <- knn2nb(knn_PMI_matched)
+neighborhood_PMI_prematch <- knn2nb(knn_PMI_prematch)
+
+# Convert to adjacency weight list.
+
+w_list_PML_matched <- nb2listw(neighbours = neighborhood_PML_matched, style = 'W')
+w_list_PML_prematch <- nb2listw(neighbours = neighborhood_PML_prematch, style = 'W')
+w_list_PMI_matched<- nb2listw(neighbours = neighborhood_PMI_matched, style = 'W')
+w_list_PMI_prematch <- nb2listw(neighbours = neighborhood_PMI_prematch, style = 'W')
+
+g_PML_matched <- localG(as.numeric(spatial_PML_matched$fl.pre.5cell), 
+                listw = w_list_PML_matched,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+g_PML_prematch <- localG(as.numeric(spatial_PML_prematch$fl.pre.5cell), 
+                listw = w_list_PML_prematch,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+g_PMI_matched <- localG(as.numeric(spatial_PMI_matched$fl.pre.5cell), 
+                listw = w_list_PMI_matched,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+g_PMI_prematch <- localG(as.numeric(spatial_PMI_prematch$fl.pre.5cell), 
+                listw = w_list_PMI_prematch,
+                zero.policy = FALSE,
+                return_internals = TRUE)
+
+
+spatial_PML_matched$g <- attr(g_PML_matched, 'internals')[,1]
+spatial_PML_prematch$g <- attr(g_PML_prematch, 'internals')[,1]
+spatial_PMI_matched$g <- attr(g_PMI_matched, 'internals')[,1]
+spatial_PMI_prematch$g <- attr(g_PMI_prematch, 'internals')[,1]
+
+plot(spatial_PML_matched['g'], axes = TRUE, pch = 20, cex = 0.1, breaks = "jenks")
+
+```
+
+
+```{r retrying fig 4 (PML only), echo = FALSE}
+
+# matched models
+
+fig4.a.lisa.PML.pre <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
                pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
-               A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
+               A130 + A154 + A347 + A361 + A362 + gpre + nbsize, data = spatial_PML_prematch)
 
-fig4.b.lisa <- lm(fl.5yr.postPML ~ PML, weights = weights,
-             data = spatial_PML)
+fig4.b.lisa.PML.pre <- lm(fl.5yr.postPML ~ PML, weights = weights,
+             data = spatial_PML_matched)
 
-fig4.c.lisa <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+fig4.c.lisa.PML.pre <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
              pop.den.5km.pre + dist.disturb.pre +
-             A128 + A129 + A130 + A154 + A347 + A361 + A362 + g,
-             weights = weights, data = spatial_PML)
+             A128 + A129 + A130 + A154 + A347 + A361 + A362 + gpre + nbsize,
+             weights = weights, data = spatial_PML_matched)
 
 ```
 ```{r make original figure 4, echo = FALSE}
 
-# generating the figure from the paper using coefplot's multiplot() function
-# I've made it look a little better than the version in the paper
+# generating the coefplot from the paper for PML data
 
-fig4.lisa <- multiplot(fig4.a.lisa, fig4.b.lisa, fig4.c.lisa, coefficients = "PML",
+fig4.lisa.PML.pre <- multiplot(fig4.a.lisa.PML.pre, 
+                               fig4.b.lisa.PML.pre, 
+                               fig4.c.lisa.PML.pre, 
+                               coefficients = "PML",
                   names = c("(a)", "(b)", "(c)"), title = NULL,
                   ylab = NULL, xlab = expression(paste(
                     "Effect on deforestation over 5 years (",
@@ -138,5 +368,197 @@ fig4.lisa <- multiplot(fig4.a.lisa, fig4.b.lisa, fig4.c.lisa, coefficients = "PM
                   lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE,
                   secret.weapon = TRUE, color = "black")
 
-fig4.lisa + theme_minimal()
+fig4.lisa.PML.pre + theme_minimal()
 ```
+
+```{r retrying fig 6 (PMI), echo = FALSE}
+
+# matched models
+
+fig4.a.lisa.PMI.pre <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
+               A130 + A154 + A347 + A361 + A362 + gpre + nbsize, 
+               data = spatial_PMI_prematch)
+
+fig4.b.lisa.PMI.pre <- lm(fl.5yr.postPML ~ PMI, weights = weights,
+             data = spatial_PMI_matched)
+
+fig4.c.lisa.PMI.pre <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre +
+             pop.den.5km.pre + dist.disturb.pre +
+             A128 + A129 + A130 + A154 + A347 + A361 + A362 + gpre + nbsize,
+             weights = weights, data = spatial_PMI_matched)
+
+```
+```{r make original figure 4, echo = FALSE}
+
+# generating the coefplot from the paper for PML data
+
+fig4.lisa.PMI.pre <- multiplot(fig4.a.lisa.PMI.pre, 
+                               fig4.b.lisa.PMI.pre, 
+                               fig4.c.lisa.PMI.pre, 
+                               coefficients = "PMI",
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL, xlab = expression(paste(
+                    "Effect on deforestation over 5 years (",
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3,
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE,
+                  secret.weapon = TRUE, color = "black")
+
+fig4.lisa.PMI.pre + theme_minimal()
+```
+
+```{r table for PML models, echo = FALSE}
+# make huxtable object
+
+table3 <- huxreg("Model A" = fig4.a.lisa.PML.pre, 
+                 "Model B" = fig4.b.lisa.PML.pre, 
+                 "Model C" = fig4.c.lisa.PML.pre,
+                 coefs = c("(Intercept)" = "(Intercept)",
+                           "PML (treatment)" = "PML",
+                           "Pre-treatment Forest Loss" = "fl.pre.5cell",
+                           "Pre-treatment Forest Cover" = "forest.pre",
+                           "Population Density" = "pop.den.5km.pre",
+                           "Distance to Disturbed Land Classification" = "dist.disturb.pre",
+                           "Distance to Electric Grid" = "A128",
+                           "Distance to Major River" = "A129",
+                           "Distance to Major Roads" = "A130",
+                           "Shaur Indigenous Land" = "A154",
+                           "Protected Area Status" = "A347",
+                           "Elevation" = "A361",
+                           "Slope" = "A362",
+                           "Getis-Ord G" = "gpre",
+                           "Neighborhood Size" = "nbsize"),
+                 statistics = c('Total Observations' = 'nobs',
+                                'R squared' = 'r.squared'),
+                 number_format = 2) %>%
+  set_caption("Table 3: Extended Results, PML-only treatment (2002)")
+
+table3
+```
+
+```{r table for PMI models, echo = FALSE}
+# make huxtable object
+
+table4 <- huxreg("Model A" = fig4.a.lisa.PMI.pre, 
+                 "Model B" = fig4.b.lisa.PMI.pre, 
+                 "Model C" = fig4.c.lisa.PMI.pre,
+                 coefs = c("(Intercept)" = "(Intercept)",
+                           "PMI (treatment)" = "PMI",
+                           "Pre-treatment Forest Loss" = "fl.pre.5cell",
+                           "Pre-treatment Forest Cover" = "forest.pre",
+                           "Population Density" = "pop.den.5km.pre",
+                           "Distance to Disturbed Land Classification" = "dist.disturb.pre",
+                           "Distance to Electric Grid" = "A128",
+                           "Distance to Major River" = "A129",
+                           "Distance to Major Roads" = "A130",
+                           "Shaur Indigenous Land" = "A154",
+                           "Protected Area Status" = "A347",
+                           "Elevation" = "A361",
+                           "Slope" = "A362",
+                           "Getis-Ord G" = "gpre",
+                           "Neighborhood Size" = "nbsize"),
+                 statistics = c('Total Observations' = 'nobs',
+                                'R squared' = 'r.squared'),
+                 number_format = 2) %>%
+  set_caption("Table 4: Extended Results, PMI + PML treatment (2003-2007)")
+
+table4
+```
+
+```{r rematching genetically, include = FALSE}
+
+# authors wrote this to prep data for matching
+
+make <- function (data, names) {
+  datasub <- as.data.frame(data)
+  sub = substitute(names)
+  names <- as.character(sub)
+  data.make <- subset(datasub,select = names(datasub) %in% names)
+  data.make <<- na.omit(data.make)
+  data.make <- na.omit(data.make)
+  print(c("ob =",nrow(data.make)),quote=F)
+}
+
+# PML only matching
+
+make(spatial_PML_prematch, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
+   fl.yr5, PML, fl.pre.5cell, forest.pre,
+   pop.den.5km.pre, dist.disturb.pre, A128, A129,
+   A130, A154, A347, A361, A362, id, LAT, LONG, gpre, nbsize))
+
+out.PMLonly.flat <- matchit(PML ~ fl.pre.5cell + forest.pre +
+  pop.den.5km.pre + dist.disturb.pre +
+  A128 + A129 + A130 + A154 + A347 +
+  A361 + A362 + gpre + nbsize, method = "genetic",
+  int.seed = 104, unif.seed = 104,
+  pop.size = 1500, wait.generations = 20,
+  MemoryMatrix = FALSE, ties = FALSE,
+  discard = "control", data = data.make)
+
+data.PMLonly.flat.matched <- match.data(out.PMLonly.flat)
+
+# PMI matching
+
+make(spatial_PMI_prematch, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
+                      fl.yr5, PMI, fl.pre.5cell, forest.pre, pop.den.5km.pre,
+                      dist.disturb.pre, A128, A129, A130, A154, A347, A361,
+                      A362, id, LAT, LONG, gpre, nbsize))
+
+out.PMI.flat <- matchit(PMI ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
+                        dist.disturb.pre + A128 + A129 + A130 + A154 + A347 +
+                        A361 + A362 + gpre + nbsize, method = "genetic", int.seed = 101,
+                        unif.seed = 101, pop.size = 500, wait.generations = 20,
+                        MemoryMatrix = FALSE, ties = FALSE,
+                        discard = "control", data=data.make)
+
+data.PMI.flat.matched <- match.data(out.PMI.flat)
+
+
+# NOTE SELF: need to figure out how best to get the spatial data into these—
+# they use variables that are not included in the "_select" csvs...
+```
+
+
+
+
+
+
+
+
+
+```{r looking for vars to drop, echo = FALSE, warning = FALSE}
+
+# create a pairs plot w the model variables matched and prematched
+
+corrz <- data.PMLonly.flat.matched %>% 
+  select(PML, fl.pre.5cell, forest.pre, pop.den.5km.pre,
+         dist.disturb.pre, A128, A129, A130, A154, 
+         A347, A361, A362) %>% 
+  mutate(PML = as.factor(PML)) %>% 
+  mutate(gd = spatial_PML_matched$gd) %>% 
+  mutate(nbsize = spatial_PML_matched$nbsize)
+
+# PML + fl.pre.5cell + forest.pre +
+#                pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
+#                A130 + A154 + A347 + A361 + A362 
+
+my_cols <- c("#FC4E07", "#00AFBB")
+
+panel.cor <- function(x, y){
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- round(cor(x, y), digits=2)
+    txt <- paste0("R = ", r)
+    cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}   
+
+upper.panel <- function(x, y){
+  points(x, y, pch = 20, cex = 0.2, col = my_cols[corrz$PML])
+}
+
+pairs(corrz[-1], lower.panel = panel.cor, 
+      upper.panel = upper.panel)
+
+```
+

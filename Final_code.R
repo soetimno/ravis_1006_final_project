@@ -3,11 +3,11 @@
 # Replication code for figures and tables presented in:
 
 # Authors: Buntaine,Mark T.; Hamilton,Stuart E.; Millones,Marco
-# Title: Titling community land to prevent deforestation: An evaluation of 
+# Title: Titling community land to prevent deforestation: An evaluation of
 #a best-case program in Morona-Santiago,Ecuador
 # Journal: Global Environmental Change,vol. 33,p. 32-43.
 
-# Replication code for statistical analysis and 
+# Replication code for statistical analysis and
 # matching prepared by Mark Buntaine
 # Mark Buntaine contact (as of May 2015): buntaine@bren.ucsb.edu / 805-893-4075
 
@@ -15,18 +15,18 @@
 ###############################################################################
 ###############################################################################
 
-# TDR: Note that there are a number of comments in the text from the authors 
+# TDR: Note that there are a number of comments in the text from the authors
 # themselves. To differentiate my comments, I will put my initials at the start
 # of the comment block, as I have done here.
 
 ###############################################################################
 
 # Setting up
-# TDR: Loading the packages. arm is a modeling package, MatchIt is a package 
+# TDR: Loading the packages. arm is a modeling package, MatchIt is a package
 # (by Kosuke!) for matching treated-untreated cases for causal inference (we
-# will see below that they use genetic matching), coefplot is for plotting 
+# will see below that they use genetic matching), coefplot is for plotting
 # coefficients, ggplot2 we know well, and rgenoud is for genetic optimization;
-# not sure how it's used here yet. 
+# not sure how it's used here yet.
 
 require(arm) #Version 1.7-07
 require(MatchIt) #Version 2.4-21
@@ -40,25 +40,25 @@ require(rgenoud)
 data <- read.csv("TitlingDeforestation/BHM_sample20.csv")
 
 # TDR: these notes are from the author
-# Note: the current sample20 is modified to move first two columns 
+# Note: the current sample20 is modified to move first two columns
 # from raw GIS export
 # Note: A352 moved after A460 to match earlier versions and keep order of cols
 # Note: all NULL changed to NA with find and replace in Excel
 
-## Treatment variables 
+## Treatment variables
 # TDR: this creates two new variables to indicate treatment. Var A352 indicates
 # intervention year. 0 is no intervention, 2 is 2002, 3 is 2003, etc. Therefore
-# PML indicates whether or not treatment happened at all. PMI indicates whether 
+# PML indicates whether or not treatment happened at all. PMI indicates whether
 # or not the intervention occurred in 2003 or later. At least, according to the
 # metadata. In the supporting information, PML indicates parcels that were only
-# given legal tenure, while PMI indicates ones given legal tenure and a 
-# complementary community management plan. Need to clarify. 
+# given legal tenure, while PMI indicates ones given legal tenure and a
+# complementary community management plan. Need to clarify.
 
 data$PML <- ifelse(data$A352 == 0,0,1)
-data$PMI <- ifelse(data$A352 >= 3,1,0) 
+data$PMI <- ifelse(data$A352 >= 3,1,0)
 
 # Note: all PSUR intervention had PMI in 2003 and after
-# TDR: Just renaming cols, and then converting the "distance to Peruvian 
+# TDR: Just renaming cols, and then converting the "distance to Peruvian
 # border" variable from meters to km. The renamed cols are ones corresponding
 # to yearly forest loss data
 
@@ -68,8 +68,8 @@ names(data)[287:298] <- c("fl.2001","fl.2002","fl.2003","fl.2004",
 data$toPeru.km <- data$A486 / 1000
 
 # This function remakes the data frame with only specified columns & NAs removed:
-# TDR: this defines a function, make(), which reworks the raw dataframe into a 
-# separate, model-specific one. 
+# TDR: this defines a function, make(), which reworks the raw dataframe into a
+# separate, model-specific one.
 
 make <- function (data, names) {
   datasub <- as.data.frame(data)
@@ -94,9 +94,9 @@ make <- function (data, names) {
 # TDR: first, subset/select for observations that either were not treated or
 # were treated in the relevant year (eg 2002)
 wave.2002 <- subset(data, (A352 == 2 | A352 == 0))
-# TDR: new var total deforestation for five years after treatment 
-wave.2002$fl.5yr.postPML <- wave.2002$fl.2003 + wave.2002$fl.2004 + 
-                            wave.2002$fl.2005 + wave.2002$fl.2006 + 
+# TDR: new var total deforestation for five years after treatment
+wave.2002$fl.5yr.postPML <- wave.2002$fl.2003 + wave.2002$fl.2004 +
+                            wave.2002$fl.2005 + wave.2002$fl.2006 +
                             wave.2002$fl.2007
 
 # TDR: these rename annual forest loss to a standard form
@@ -109,12 +109,12 @@ wave.2002$fl.yr5 <- wave.2002$fl.2007
 #############################################
 # TDR: this var captures pre-treatment forest loss.
 # Done by adding one pixel loss to 3 and 5 sq pixel focal means.
-wave.2002$fl.pre.5cell <- wave.2002$fl.2001 + wave.2002$A393 + 
+wave.2002$fl.pre.5cell <- wave.2002$fl.2001 + wave.2002$A393 +
                           wave.2002$A461
 #############################################
 
 # TDR: this var is the diff of A408 (area of pixel with forest cover in 2000)
-# and fl.2001, forest loss 
+# and fl.2001, forest loss
 wave.2002$forest.pre <- wave.2002[, 314] - wave.2002[, 287]
 # TDR: this is "donut population density" from LandScan, a population density
 # dataset made by Oak Ridge Laboratory
@@ -125,20 +125,20 @@ wave.2002$pop.den.5km.pre <- wave.2002$A176
 wave.2002$pop.den.10km.pre <- wave.2002$A174
 # TDR: this var is based on MODIS data (MODIS is a specific sensor carried
 # by a pair of satellites, more information on request). One of the standard
-# products distributed by MODIS is MCD12Q, a land use classification scheme. 
-# They categorize some uses as "disturbed," such as agriculture or built 
+# products distributed by MODIS is MCD12Q, a land use classification scheme.
+# They categorize some uses as "disturbed," such as agriculture or built
 # environment. This var is the distance of a given pixel from a pixel that
-# was disturbed in 2002. 
+# was disturbed in 2002.
 wave.2002$dist.disturb.pre <- wave.2002$A116
-# TDR: not sure yet why they need a column of the word two 
+# TDR: not sure yet why they need a column of the word two
 wave.2002$wave = "two"
-# TDR: subsetting the df for pixels with more than 450000m2 of forest and 
+# TDR: subsetting the df for pixels with more than 450000m2 of forest and
 # which had formal land rights by 2008
 wave.2002 <- subset(wave.2002, forest.pre > 450000 & A346 == 0)
 
 wave.2003 <- subset(data,(A352 == 3 | A352 == 0))
-wave.2003$fl.5yr.postPML <- wave.2003$fl.2004 + wave.2003$fl.2005 + 
-                            wave.2003$fl.2006 + wave.2003$fl.2007 + 
+wave.2003$fl.5yr.postPML <- wave.2003$fl.2004 + wave.2003$fl.2005 +
+                            wave.2003$fl.2006 + wave.2003$fl.2007 +
                             wave.2003$fl.2008
 wave.2003$fl.yr1 <- wave.2003$fl.2004
 wave.2003$fl.yr2 <- wave.2003$fl.2005
@@ -156,7 +156,7 @@ wave.2003 <- subset(wave.2003, forest.pre > 450000 & A346 == 0)
 
 wave.2004 <- subset(data, A352 == 0)
 wave.2004$fl.5yr.postPML <- wave.2004$fl.2005 + wave.2004$fl.2006 +
-                            wave.2004$fl.2007 + wave.2004$fl.2008 + 
+                            wave.2004$fl.2007 + wave.2004$fl.2008 +
                             wave.2004$fl.2009
 wave.2004$fl.yr1 <- wave.2004$fl.2005
 wave.2004$fl.yr2 <- wave.2004$fl.2006
@@ -173,7 +173,7 @@ wave.2004$wave = "four"
 wave.2004 <- subset(wave.2004, forest.pre > 450000 & A346 == 0)
 
 wave.2005 <- subset(data, (A352 == 5 | A352 == 0))
-wave.2005$fl.5yr.postPML <- wave.2005$fl.2006 + wave.2005$fl.2007 + 
+wave.2005$fl.5yr.postPML <- wave.2005$fl.2006 + wave.2005$fl.2007 +
                             wave.2005$fl.2008 + wave.2005$fl.2009 +
                             wave.2005$fl.2010
 wave.2005$fl.yr1 <- wave.2005$fl.2006
@@ -191,8 +191,8 @@ wave.2005$wave = "five"
 wave.2005 <- subset(wave.2005, forest.pre > 450000 & A346 == 0)
 
 wave.2006 <- subset(data,(A352 == 6 | A352 == 0))
-wave.2006$fl.5yr.postPML <- wave.2006$fl.2007 + wave.2006$fl.2008 + 
-                            wave.2006$fl.2009 + wave.2006$fl.2010 + 
+wave.2006$fl.5yr.postPML <- wave.2006$fl.2007 + wave.2006$fl.2008 +
+                            wave.2006$fl.2009 + wave.2006$fl.2010 +
                             wave.2006$fl.2011
 wave.2006$fl.yr1 <- wave.2006$fl.2007
 wave.2006$fl.yr2 <- wave.2006$fl.2008
@@ -209,8 +209,8 @@ wave.2006$wave = "six"
 wave.2006 <- subset(wave.2006, forest.pre > 450000 & A346 == 0)
 
 wave.2007 <- subset(data,(A352 == 7 | A352 == 0))
-wave.2007$fl.5yr.postPML <- wave.2007$fl.2008 + wave.2007$fl.2009 + 
-                            wave.2007$fl.2010 + wave.2007$fl.2011 + 
+wave.2007$fl.5yr.postPML <- wave.2007$fl.2008 + wave.2007$fl.2009 +
+                            wave.2007$fl.2010 + wave.2007$fl.2011 +
                             wave.2007$fl.2012
 wave.2007$fl.yr1 <- wave.2007$fl.2008
 wave.2007$fl.yr2 <- wave.2007$fl.2009
@@ -232,7 +232,7 @@ wave.2007 <- subset(wave.2007, forest.pre > 450000 & A346 == 0)
 data.flat <- rbind(wave.2002, wave.2003, wave.2004, wave.2005, wave.2006,
                    wave.2007)
 
-# TDR: Finally, create a new id variable from that string variable by pasting 
+# TDR: Finally, create a new id variable from that string variable by pasting
 # the string to the observation/pixel's objectid
 
 data.flat$id <- paste(data.flat$wave, data.flat$OBJECTID, sep="")
@@ -241,32 +241,39 @@ data.flat$id <- paste(data.flat$wave, data.flat$OBJECTID, sep="")
 # Figure 4
 
 # Excluding PMI plots from control group
-# TDR: dropping obs of plots given both a legal tenure and a 
+# TDR: dropping obs of plots given both a legal tenure and a
 # complementary community management plan.
 
-data.PMLonly.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 0)) 
+data.PMLonly.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 0))
 
-write_csv(data.PMLonly.flat, "TitlingDeforestation/PML_prematching.csv")
+# TDR: selecting only relevant cols to keep these from being ENORMOUS dataframes
+
+data.PMLonly.flat <- data.PMLonly.flat %>%
+  select(fl.5yr.postPML, PML, fl.pre.5cell, forest.pre,
+         pop.den.5km.pre, dist.disturb.pre, A128, A129,
+         A130, A154, A347, A361, A362)
+
+write_csv(data.PMLonly.flat, "TitlingDeforestation/PML_prematching_select.csv")
 
 data.PMLonly.flat <- read_csv("TitlingDeforestation/PML_prematching.csv")
 
 # Models for PML
 # TDR: standard multiple linear regression, regressing forest loss over five
-# years, in each year, on 12 predictors (the unnamed ones are distance to 
+# years, in each year, on 12 predictors (the unnamed ones are distance to
 # electric grid (A128), distance to major river (A129), distance to major
 # roads (A130), whether the land belongs to the indigenous Shuar (A154),
 # whether it has "loose or solid protection" (A347), elevation (A361),
 # and slope (A362)). Then they summarize it.
 
 fig4.a <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
-  pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+  pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
   A130 + A154 + A347 + A361 + A362, data = data.PMLonly.flat)
 summary(fig4.a)
 
 # TDR: here they run their make() function on the PML-only df to produce
 # the input for matching
 
-make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
    fl.yr5, PML, fl.pre.5cell, forest.pre,
    pop.den.5km.pre, dist.disturb.pre, A128, A129,
    A130, A154, A347, A361, A362, id))
@@ -277,7 +284,7 @@ make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
 # COMMENTING OUT MATCHIT MATCHING, USING DATA FROM AUTHOR FROM HERE ON
 #################################
 #THIS IS GENETIC, TRYING CEM BELOW
-# out.PMLonly.flat <- matchit(PML ~ fl.pre.5cell + forest.pre + 
+# out.PMLonly.flat <- matchit(PML ~ fl.pre.5cell + forest.pre +
 #   pop.den.5km.pre + dist.disturb.pre +
 #   A128 + A129 + A130 + A154 + A347 +
 #   A361 + A362, method = "genetic",
@@ -292,12 +299,12 @@ out.PMLonly.flat2 <- matchit(PML ~ fl.pre.5cell + forest.pre +
   A361 + A362, data = data.make, discard = "control",
   method = "cem")
 
-# Note: matching takes approximately 1 week on standard-build desktop 
+# Note: matching takes approximately 1 week on standard-build desktop
 # computer at time of writing
 
 # Information used for SI Table B1
 
-# summary(out.PMLonly.flat, interactions = T, standardize = T) 
+# summary(out.PMLonly.flat, interactions = T, standardize = T)
 
 # TDR: Here they are outputting the matched dataset, a week later.
 
@@ -317,46 +324,46 @@ data.PMLonly.flat.matched <- read_csv("TitlingDeforestation/PMLonly_flat_matched
 # TDR: Here they are running the regressions to be used on p 40 of their paper,
 # combined as "fig4"
 
-fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+fig4.b <- lm(fl.5yr.postPML ~ PML, weights = weights,
              data = data.PMLonly.flat.matched2)
 summary(fig4.b)
 
 fig4.c <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + f
-             orest.pre + pop.den.5km.pre + dist.disturb.pre + 
-             A128 + A129 + A130 + A154 + A347 + A361 + A362, 
+             orest.pre + pop.den.5km.pre + dist.disturb.pre +
+             A128 + A129 + A130 + A154 + A347 + A361 + A362,
              weights = weights, data = data.PMLonly.flat.matched2)
 summary(fig4.c)
 
-fig4 <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML", 
+fig4 <- multiplot(fig4.a, fig4.b, fig4.c, coefficients = "PML",
                   names = c("(a)", "(b)", "(c)"), title = NULL,
                   ylab = NULL, xlab = expression(paste(
                     "Effect on deforestation over 5 years (",
-                    m^{2} , " per " , km^{2}, ")")), pointSize = 3, 
-                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE, 
+                    m^{2} , " per " , km^{2}, ")")), pointSize = 3,
+                  lwdOuter = 0.5, lwdInner = 1.5, horizontal = TRUE,
                   secret.weapon = TRUE, color = "black")
 
-fig4 + theme_minimal() 
+fig4 + theme_minimal()
 
 ###############################################################################
 
 # Figure 5
 
-# TDR: The next 70 lines or so are very clearly explained in the authors' 
-# comments. The figure produced (p 40 of the paper) shows the effects 
+# TDR: The next 70 lines or so are very clearly explained in the authors'
+# comments. The figure produced (p 40 of the paper) shows the effects
 # of treatment by year
 # Model 1 is year-on-year decomposition of Model (a) in Figure 4
 
-m1.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362, data = data.PMLonly.flat)
 summary(m1.PML1)
 
-m1.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
               dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362,data = data.PMLonly.flat)
 summary(m1.PML2)
 
-m1.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
               dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362,data = data.PMLonly.flat)
 summary(m1.PML3)
@@ -366,18 +373,18 @@ m1.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
               A362,data = data.PMLonly.flat)
 summary(m1.PML4)
 
-m1.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362,data = data.PMLonly.flat)
 summary(m1.PML5)
 
 # Model 2 is year-on-year decomposition of Model (b) in Figure 4
 
-m2.PML1 <- lm(fl.yr1 ~ PML, weights = weights, 
+m2.PML1 <- lm(fl.yr1 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML1)
 
-m2.PML2 <- lm(fl.yr2 ~ PML, weights = weights, 
+m2.PML2 <- lm(fl.yr2 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML2)
 
@@ -389,14 +396,14 @@ m2.PML4 <- lm(fl.yr4 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML4)
 
-m2.PML5 <- lm(fl.yr5 ~ PML,weights = weights, 
+m2.PML5 <- lm(fl.yr5 ~ PML,weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML5)
 
 # Model 3 is year-on-year decomposition of Model (c) in Figure 6
 
 m3.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362, weights = weights, data = data.PMLonly.flat.matched)
 summary(m3.PML1)
 
@@ -405,62 +412,62 @@ m3.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
               A362, weights = weights, data = data.PMLonly.flat.matched)
 summary(m3.PML2)
 
-m3.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m3.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362, weights = weights, data = data.PMLonly.flat.matched)
 summary(m3.PML3)
 
-m3.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
               dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362, weights = weights, data = data.PMLonly.flat.matched)
 summary(m3.PML4)
 
 m3.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362, weights = weights, data = data.PMLonly.flat.matched)
 summary(m3.PML5)
 
 ##Year by year effects of PML
 # TDR: here they're building vectors of coefficients and errors of each
-# model run above. 
+# model run above.
 
 year <- seq(1:5)
-m1.coef <- c(m1.PML1$coef[2], m1.PML2$coef[2], m1.PML3$coef[2], 
+m1.coef <- c(m1.PML1$coef[2], m1.PML2$coef[2], m1.PML3$coef[2],
              m1.PML4$coef[2], m1.PML5$coef[2])
-m1.se <- c(coef(summary(m1.PML1))[2, 2], coef(summary(m1.PML2))[2, 2], 
-           coef(summary(m1.PML3))[2, 2], coef(summary(m1.PML4))[2, 2], 
+m1.se <- c(coef(summary(m1.PML1))[2, 2], coef(summary(m1.PML2))[2, 2],
+           coef(summary(m1.PML3))[2, 2], coef(summary(m1.PML4))[2, 2],
            coef(summary(m1.PML5))[2, 2])
 
-m2.coef <- c(m2.PML1$coef[2], m2.PML2$coef[2], m2.PML3$coef[2], 
+m2.coef <- c(m2.PML1$coef[2], m2.PML2$coef[2], m2.PML3$coef[2],
              m2.PML4$coef[2], m2.PML5$coef[2])
-m2.se <- c(coef(summary(m2.PML1))[2, 2], coef(summary(m2.PML2))[2, 2], 
-           coef(summary(m2.PML3))[2, 2], coef(summary(m2.PML4))[2, 2], 
+m2.se <- c(coef(summary(m2.PML1))[2, 2], coef(summary(m2.PML2))[2, 2],
+           coef(summary(m2.PML3))[2, 2], coef(summary(m2.PML4))[2, 2],
            coef(summary(m2.PML5))[2, 2])
 
 m3.coef <- c(m3.PML1$coef[2], m3.PML2$coef[2], m3.PML3$coef[2],
              m3.PML4$coef[2], m3.PML5$coef[2])
-m3.se <- c(coef(summary(m3.PML1))[2, 2], coef(summary(m3.PML2))[2, 2], 
-           coef(summary(m3.PML3))[2, 2], coef(summary(m3.PML4))[2, 2], 
+m3.se <- c(coef(summary(m3.PML1))[2, 2], coef(summary(m3.PML2))[2, 2],
+           coef(summary(m3.PML3))[2, 2], coef(summary(m3.PML4))[2, 2],
            coef(summary(m3.PML5))[2, 2])
 
 # TDR: Plotting
 
 par(mar = c(4.1,5.1,1.1,1.1))
-plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-600, 400), 
+plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-600, 400),
      ylab = expression(paste("Effect on Deforestation (",
-                             m^{2} , " per " , km^{2}, ")")), 
+                             m^{2} , " per " , km^{2}, ")")),
      xlab = "Year", cex.lab = 1, cex.axis = 1)
 abline(h = 0,lty = 2)
 polygon(x=c(year[1:5], year[5:1]), y = c(m1.coef + 2 * m1.se, m1.coef[5:1] - 2
-                                         * m1.se[5:1]), 
-        col = rgb(.6, .6, .6, 0.5), 
+                                         * m1.se[5:1]),
+        col = rgb(.6, .6, .6, 0.5),
         border = NA)
 polygon(x=c(year[1:5], year[5:1]), y = c(m2.coef + 2 * m2.se, m2.coef[5:1] - 2
-                                         * m2.se[5:1]), 
-        col = rgb(0, 0, 0.8, 0.5), 
+                                         * m2.se[5:1]),
+        col = rgb(0, 0, 0.8, 0.5),
         border = NA)
 polygon(x=c(year[1:5], year[5:1]), y = c(m3.coef + 2 * m3.se, m3.coef[5:1] - 2
-                                         * m3.se[5:1]), 
+                                         * m3.se[5:1]),
         col = rgb(0, 0, 1, 0.5),
         border = NA)
 lines(year, m1.coef, type = "l", col = "black", lwd = 2)
@@ -474,21 +481,27 @@ lines(year, m3.coef, type = "l", col = "blue", lwd = 2)
 
 # Excluding PML-only plots from control group
 # TDR: Here they're doing the opposite subsetting as they did for figure 4
-# above. They're keeping only obs given both a legal tenure and a 
-# complementary community management plan, and dropping those given only 
-# the former. The sequence here is the same as fig 4; the figure produced 
+# above. They're keeping only obs given both a legal tenure and a
+# complementary community management plan, and dropping those given only
+# the former. The sequence here is the same as fig 4; the figure produced
 # (p 41 of the paper) is like that in figure 4
 
-data.PMI.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 1)) 
+data.PMI.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 1))
 
-write_csv(data.PMI.flat, "TitlingDeforestation/PMI_prematching.csv")
+# selecting only relevant cols to keep these from being ENORMOUS dataframes
+
+data.PMI.flat <- data.PMI.flat %>%
+  select(fl.5yr.postPML, PMI, fl.pre.5cell, forest.pre,
+         pop.den.5km.pre, dist.disturb.pre, A128, A129,
+         A130, A154, A347, A361, A362)
+
+write_csv(data.PMI.flat, "TitlingDeforestation/PMI_prematching_select.csv")
 
 data.PMI.flat <- read_csv("TitlingDeforestation/PMI_prematching.csv")
 
-
 # Models
 
-fig6.a <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre + 
+fig6.a <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre +
              pop.den.5km.pre + dist.disturb.pre + A128 + A129 + A130 +
              A154 + A347 + A361 + A362, data = data.PMI.flat)
 summary(fig6.a)
@@ -498,15 +511,15 @@ summary(fig6.a)
 # COMMENTING OUT MATCHIT MATCHING, USING DATA FROM AUTHOR FROM HERE ON
 #################################
 
-# make(data.PMI.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
+# make(data.PMI.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
 #                       fl.yr5, PMI, fl.pre.5cell, forest.pre, pop.den.5km.pre,
-#                       dist.disturb.pre, A128, A129, A130, A154, A347, A361, 
+#                       dist.disturb.pre, A128, A129, A130, A154, A347, A361,
 #                       A362, id))
 # out.PMI.flat <- matchit(PMI ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
 #                         dist.disturb.pre + A128 + A129 + A130 + A154 + A347 +
-#                         A361 + A362, method = "genetic", int.seed = 101, 
+#                         A361 + A362, method = "genetic", int.seed = 101,
 #                         unif.seed = 101, pop.size = 500, wait.generations = 20,
-#                         MemoryMatrix = FALSE, ties = FALSE, 
+#                         MemoryMatrix = FALSE, ties = FALSE,
 #                         discard = "control", data=data.make)
 
 # Note: matching takes approximately 48 hours on standard-build desktop
@@ -514,10 +527,10 @@ summary(fig6.a)
 
 # Information used for SI Table B1
 
-# summary(out.PMI.flat, interactions = T, standardize = T) 
+# summary(out.PMI.flat, interactions = T, standardize = T)
 # data.PMI.flat.matched <- match.data(out.PMI.flat)
 
-# Note: data.PMI.flat.matched saved as "PMI_flat_matched_140414.csv" and 
+# Note: data.PMI.flat.matched saved as "PMI_flat_matched_140414.csv" and
 # available from authors on request
 
 
@@ -527,19 +540,19 @@ summary(fig6.a)
 
 data.PMI.flat.matched <- read_csv("TitlingDeforestation/PMI_flat_matched_140414.csv")
 
-fig6.b <- lm(fl.5yr.postPML ~ PMI, weights = weights, 
+fig6.b <- lm(fl.5yr.postPML ~ PMI, weights = weights,
              data = data.PMI.flat.matched)
 summary(fig6.b)
 
-fig6.c <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre + 
-             pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
-             A130 + A154 + A347 + A361 + A362, weights = weights, 
+fig6.c <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre +
+             pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
+             A130 + A154 + A347 + A361 + A362, weights = weights,
              data = data.PMI.flat.matched)
 summary(fig6.c)
 
-fig6 <- multiplot(fig6.a, fig6.b, fig6.c, coefficients = "PMI", 
-                  names = c("(a)", "(b)", "(c)"), title = NULL, 
-                  ylab = NULL, 
+fig6 <- multiplot(fig6.a, fig6.b, fig6.c, coefficients = "PMI",
+                  names = c("(a)", "(b)", "(c)"), title = NULL,
+                  ylab = NULL,
                   xlab = expression(paste("Effect on deforestation over 5 years (",
                                           m^{2} , " per " , km^{2}, ")")),
                   pointSize = 3, lwdOuter = 0.5,lwdInner = 1.5,
@@ -552,31 +565,31 @@ fig6 + theme_minimal()
 # Figure 7
 
 # Model 1 is year-on-year decomposition of Model (a) in Figure 6
-# TDR: This sequence is the same as figure 5, except for a different set of 
+# TDR: This sequence is the same as figure 5, except for a different set of
 # treated obs
 
-m1.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, data = data.PMI.flat)
 summary(m1.1)
 
-m1.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, data = data.PMI.flat)
 summary(m1.2)
 
-m1.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, data = data.PMI.flat)
 summary(m1.3)
 
-m1.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, data = data.PMI.flat)
 summary(m1.4)
 
-m1.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, data = data.PMI.flat)
 summary(m1.5)
 
@@ -599,18 +612,18 @@ summary(m2.5)
 
 # Model 3 is year-on-year decomposition of Model (c) in Figure 6
 
-m3.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m3.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, weights=weights,data=data.PMI.flat.matched)
 summary(m3.1)
 
 m3.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, weights = weights, data = data.PMI.flat.matched)
 summary(m3.2)
 
-m3.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m3.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, weights = weights, data = data.PMI.flat.matched)
 summary(m3.3)
 
@@ -619,45 +632,45 @@ m3.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
            A362, weights = weights, data = data.PMI.flat.matched)
 summary(m3.4)
 
-m3.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m3.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
            A362, weights = weights, data = data.PMI.flat.matched)
 summary(m3.5)
 
 ##Year by year effects of PMI
 
 year <- seq(1:5)
-m1.coef <- c(m1.1$coef[2], m1.2$coef[2], m1.3$coef[2], m1.4$coef[2], 
+m1.coef <- c(m1.1$coef[2], m1.2$coef[2], m1.3$coef[2], m1.4$coef[2],
              m1.5$coef[2])
-m1.se <- c(coef(summary(m1.1))[2, 2], coef(summary(m1.2))[2, 2], 
-           coef(summary(m1.3))[2, 2], coef(summary(m1.4))[2, 2], 
+m1.se <- c(coef(summary(m1.1))[2, 2], coef(summary(m1.2))[2, 2],
+           coef(summary(m1.3))[2, 2], coef(summary(m1.4))[2, 2],
            coef(summary(m1.5))[2, 2])
-m2.coef <- c(m2.1$coef[2], m2.2$coef[2], m2.3$coef[2], m2.4$coef[2], 
+m2.coef <- c(m2.1$coef[2], m2.2$coef[2], m2.3$coef[2], m2.4$coef[2],
              m2.5$coef[2])
-m2.se <- c(coef(summary(m2.1))[2, 2], coef(summary(m2.2))[2, 2], 
-           coef(summary(m2.3))[2, 2], coef(summary(m2.4))[2, 2], 
+m2.se <- c(coef(summary(m2.1))[2, 2], coef(summary(m2.2))[2, 2],
+           coef(summary(m2.3))[2, 2], coef(summary(m2.4))[2, 2],
            coef(summary(m2.5))[2, 2])
 m3.coef <- c(m3.1$coef[2], m3.2$coef[2], m3.3$coef[2], m3.4$coef[2],
              m3.5$coef[2])
-m3.se <- c(coef(summary(m3.1))[2, 2], coef(summary(m3.2))[2, 2], 
-           coef(summary(m3.3))[2, 2], coef(summary(m3.4))[2, 2], 
+m3.se <- c(coef(summary(m3.1))[2, 2], coef(summary(m3.2))[2, 2],
+           coef(summary(m3.3))[2, 2], coef(summary(m3.4))[2, 2],
            coef(summary(m3.5))[2, 2])
 
 
 par(mar = c(4.1, 5.1, 1.1,1.1))
-plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-500, 400), 
-     ylab = expression(paste("Effect on Deforestation (", m^{2} , 
-                             " per ", km^{2}, ")")), 
+plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-500, 400),
+     ylab = expression(paste("Effect on Deforestation (", m^{2} ,
+                             " per ", km^{2}, ")")),
      xlab = "Year", cex.lab = 1, cex.axis = 1)
 abline(h = 0, lty = 2)
 polygon(x = c(year[1:5], year[5:1]),
         y = c(m1.coef + 2 * m1.se, m1.coef[5:1] - 2 * m1.se[5:1]),
         col = rgb(.6, .6, .6, 0.5), border = NA)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m2.coef + 2 * m2.se, m2.coef[5:1] - 2 * m2.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m2.coef + 2 * m2.se, m2.coef[5:1] - 2 * m2.se[5:1]),
         col = rgb(0, 0, 0.8, 0.5), border = NA)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m3.coef + 2 * m3.se, m3.coef[5:1] - 2 * m3.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m3.coef + 2 * m3.se, m3.coef[5:1] - 2 * m3.se[5:1]),
         col = rgb(0, 0, 1, 0.5), border = NA)
 lines(year, m1.coef, type = "l", col = "black", lwd = 3)
 lines(year, m2.coef, type = "l", col = "blue", lwd =  3)
@@ -668,68 +681,68 @@ lines(year, m3.coef, type = "l", col = "blue", lwd = 3)
 
 # Figure B1 (Supporting Information)
 
-data.PML.flat.Shaur <- subset(data.flat, (PML == 0 | (PML == 1 & PMI == 0)) 
+data.PML.flat.Shaur <- subset(data.flat, (PML == 0 | (PML == 1 & PMI == 0))
                               & A154 == 1)
 
-m1s.PML <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre + 
-             pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+m1s.PML <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
+             pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
              A130 + A347 + A361 + A362, data = data.PML.flat.Shaur)
 summary(m1s.PML)
 
-m1s.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + 
-               pop.den.5km.pre + dist.disturb.pre + A128 + 
+m1s.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 +
                A129 + A130 + A347 + A361 + A362, data = data.PML.flat.Shaur)
 summary(m1s.PML1)
 
 m1s.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-               dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362, 
+               dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
                data = data.PML.flat.Shaur)
 summary(m1s.PML2)
 
-m1s.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-               dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362, 
+m1s.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+               dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
                data = data.PML.flat.Shaur)
 summary(m1s.PML3)
 
-m1s.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1s.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
                dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
                data = data.PML.flat.Shaur)
 summary(m1s.PML4)
 
-m1s.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1s.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
                dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
                data = data.PML.flat.Shaur)
 summary(m1s.PML5)
 
-make(data.PML.flat.Shaur, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
-                            fl.yr5, PML, fl.pre.5cell, forest.pre, 
-                            pop.den.5km.pre, dist.disturb.pre, A128, A129, 
+make(data.PML.flat.Shaur, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
+                            fl.yr5, PML, fl.pre.5cell, forest.pre,
+                            pop.den.5km.pre, dist.disturb.pre, A128, A129,
                             A130, A347, A361, A362, id, x, y))
-out.PML.s.flat <- matchit(PML ~ fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+out.PML.s.flat <- matchit(PML ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
                           dist.disturb.pre + A128 + A129 + A130 + A347 + A361 +
-                          A362, method = "genetic", int.seed = 102, 
-                          unif.seed = 102, pop.size = 2000, 
-                          wait.generations = 20, MemoryMatrix = FALSE, 
+                          A362, method = "genetic", int.seed = 102,
+                          unif.seed = 102, pop.size = 2000,
+                          wait.generations = 20, MemoryMatrix = FALSE,
                           ties = FALSE, discard = "control", data = data.make)
 sum.s.PML <- summary(out.PML.s.flat, interactions = T, standardize = T)
 data.PMLonly.s.flat.matched <- match.data(out.PML.s.flat)
 
-# write.csv(data.PMLonly.s.flat.matched,quote=F, 
+# write.csv(data.PMLonly.s.flat.matched,quote=F,
 #   file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMLonly_Shaur_flat_matched_140422.csv", row.names=F)
 
-m2s.PML <- lm(fl.5yr.postPML ~ PML, weights = weights, 
+m2s.PML <- lm(fl.5yr.postPML ~ PML, weights = weights,
               data = data.PMLonly.s.flat.matched)
 summary(m2s.PML)
 
-m2s.PML1 <- lm(fl.yr1 ~ PML, weights = weights, 
+m2s.PML1 <- lm(fl.yr1 ~ PML, weights = weights,
                data = data.PMLonly.s.flat.matched)
 summary(m2s.PML1)
 
-m2s.PML2 <- lm(fl.yr2 ~ PML, weights = weights, 
+m2s.PML2 <- lm(fl.yr2 ~ PML, weights = weights,
                data = data.PMLonly.s.flat.matched)
 summary(m2s.PML2)
 
-m2s.PML3 <- lm(fl.yr3 ~ PML, weights = weights, 
+m2s.PML3 <- lm(fl.yr3 ~ PML, weights = weights,
                data = data.PMLonly.s.flat.matched)
 summary(m2s.PML3)
 
@@ -747,44 +760,44 @@ m3s.PML <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
               weights = weights, data = data.PMLonly.s.flat.matched)
 summary(m3s.PML)
 
-m3s.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + 
+m3s.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre +
                pop.den.5km.pre + dist.disturb.pre + A128 +
-               A129 + A130 + A347 + A361 + A362, 
+               A129 + A130 + A347 + A361 + A362,
                weights = weights, data = data.PMLonly.s.flat.matched)
 summary(m3s.PML1)
 
 m3s.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre +
-               pop.den.5km.pre + dist.disturb.pre + A128 + 
-               A129 + A130 + A347 + A361 + A362, 
+               pop.den.5km.pre + dist.disturb.pre + A128 +
+               A129 + A130 + A347 + A361 + A362,
                weights = weights, data = data.PMLonly.s.flat.matched)
 summary(m3s.PML2)
 
-m3s.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + 
+m3s.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre +
                pop.den.5km.pre + dist.disturb.pre + A128 +
-               A129 + A130 + A347 + A361 + A362, 
+               A129 + A130 + A347 + A361 + A362,
                weights = weights, data = data.PMLonly.s.flat.matched)
 summary(m3s.PML3)
 
-m3s.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + 
-               pop.den.5km.pre + dist.disturb.pre + A128 + 
+m3s.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 +
                A129 + A130 + A347 + A361 + A362,
                weights = weights, data = data.PMLonly.s.flat.matched)
 summary(m3s.PML4)
 
-m3s.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + 
-               pop.den.5km.pre + dist.disturb.pre + A128 + 
+m3s.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre +
+               pop.den.5km.pre + dist.disturb.pre + A128 +
                A129 + A130 + A347 + A361 + A362,
                weights = weights, data = data.PMLonly.s.flat.matched)
 summary(m3s.PML5)
 
 B1 <- multiplot(m1s.PML, m2s.PML, m3s.PML, coefficients = "PML",
-                names = c("(a)", "(b)", "(c)"), title = NULL, 
-                ylab = NULL, 
+                names = c("(a)", "(b)", "(c)"), title = NULL,
+                ylab = NULL,
                 xlab = expression(paste("Effect on deforestation over 5 years (",
                                         m^{2} , " per " , km^{2}, ")")),
-                pointSize = 5, lwdOuter = 2, horizontal = TRUE, 
+                pointSize = 5, lwdOuter = 2, horizontal = TRUE,
                 secret.weapon = TRUE)
-B1 + theme_bw(base_size = 18) 
+B1 + theme_bw(base_size = 18)
 
 # Note: save as 600X400
 
@@ -794,36 +807,36 @@ B1 + theme_bw(base_size = 18)
 # Figure B2 (Supporting Information)
 
 year <- seq(1:5)
-m1s.coef <- c(m1s.PML1$coef[2], m1s.PML2$coef[2], m1s.PML3$coef[2], 
+m1s.coef <- c(m1s.PML1$coef[2], m1s.PML2$coef[2], m1s.PML3$coef[2],
               m1s.PML4$coef[2], m1s.PML5$coef[2])
 m1s.se <- c(coef(summary(m1s.PML1))[2, 2], coef(summary(m1s.PML2))[2, 2],
             coef(summary(m1s.PML3))[2, 2], coef(summary(m1s.PML4))[2, 2],
             coef(summary(m1s.PML5))[2, 2])
-m2s.coef <- c(m2s.PML1$coef[2], m2s.PML2$coef[2], m2s.PML3$coef[2], 
+m2s.coef <- c(m2s.PML1$coef[2], m2s.PML2$coef[2], m2s.PML3$coef[2],
               m2s.PML4$coef[2], m2s.PML5$coef[2])
-m2s.se <- c(coef(summary(m2s.PML1))[2, 2], coef(summary(m2s.PML2))[2, 2], 
-            coef(summary(m2s.PML3))[2, 2], coef(summary(m2s.PML4))[2, 2], 
+m2s.se <- c(coef(summary(m2s.PML1))[2, 2], coef(summary(m2s.PML2))[2, 2],
+            coef(summary(m2s.PML3))[2, 2], coef(summary(m2s.PML4))[2, 2],
             coef(summary(m2s.PML5))[2, 2])
-m3s.coef <- c(m3s.PML1$coef[2], m3s.PML2$coef[2], m3s.PML3$coef[2], 
+m3s.coef <- c(m3s.PML1$coef[2], m3s.PML2$coef[2], m3s.PML3$coef[2],
               m3s.PML4$coef[2], m3s.PML5$coef[2])
-m3s.se <- c(coef(summary(m3s.PML1))[2, 2], coef(summary(m3s.PML2))[2, 2], 
-            coef(summary(m3s.PML3))[2, 2], coef(summary(m3s.PML4))[2, 2], 
+m3s.se <- c(coef(summary(m3s.PML1))[2, 2], coef(summary(m3s.PML2))[2, 2],
+            coef(summary(m3s.PML3))[2, 2], coef(summary(m3s.PML4))[2, 2],
             coef(summary(m3s.PML5))[2, 2])
 
 par(mar = c(4.1, 5.1, 1.1, 1.1))
-plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-350, 650), 
-     ylab = expression(paste("Effect on Deforestation (", 
+plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-350, 650),
+     ylab = expression(paste("Effect on Deforestation (",
                              m^{2} , " per " , km^{2}, ")")),
      xlab = "Year", cex.lab = 1.2, cex.axis = 1.2)
 abline(h = 0, lty = 2)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m1s.coef + 2 * m1s.se, m1s.coef[5:1] - 2 * m1s.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m1s.coef + 2 * m1s.se, m1s.coef[5:1] - 2 * m1s.se[5:1]),
         col = rgb(.6, .6, .6, 0.5), border = NA)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m2s.coef + 2 * m2s.se, m2s.coef[5:1] - 2 * m2s.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m2s.coef + 2 * m2s.se, m2s.coef[5:1] - 2 * m2s.se[5:1]),
         col = rgb(0, 0, 0.8, 0.5), border = NA)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m3s.coef + 2 * m3s.se, m3s.coef[5:1] - 2 * m3s.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m3s.coef + 2 * m3s.se, m3s.coef[5:1] - 2 * m3s.se[5:1]),
         col = rgb(0, 0, 1, 0.5), border = NA)
 lines(year, m1s.coef, type = "l", col = "black", lwd = 5)
 lines(year, m2s.coef, type = "l", col = "blue", lwd = 5)
@@ -836,7 +849,7 @@ lines(year, m3s.coef, type = "l", col = "blue", lwd = 5)
 
 # Figure B3 (Supporting Information)
 
-data.PMI.flat.Shaur <- subset(data.flat, 
+data.PMI.flat.Shaur <- subset(data.flat,
                               (PML == 0 | (PML == 1 & PMI == 1)) & A154 == 1)
 
 # Models
@@ -856,7 +869,7 @@ m1s.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
             data = data.PMI.flat.Shaur)
 summary(m1s.2)
 
-m1s.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1s.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
             dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
             data = data.PMI.flat.Shaur)
 summary(m1s.3)
@@ -866,21 +879,21 @@ m1s.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
             data = data.PMI.flat.Shaur)
 summary(m1s.4)
 
-m1s.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1s.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
             dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
             data = data.PMI.flat.Shaur)
 summary(m1s.5)
 
-make(data.PMI.flat.Shaur, 
-     c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, fl.yr5, PMI, 
-       fl.pre.5cell, forest.pre, pop.den.5km.pre, dist.disturb.pre, 
+make(data.PMI.flat.Shaur,
+     c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, fl.yr5, PMI,
+       fl.pre.5cell, forest.pre, pop.den.5km.pre, dist.disturb.pre,
        A128, A129, A130, A347, A361, A362, id, x, y))
 out.PMI.s.flat <- matchit(PMI ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
                           dist.disturb.pre + A128 + A129 + A130 + A347 + A361 +
-                          A362, method = "genetic", int.seed = 101, 
-                          unif.seed = 101, pop.size = 500, 
+                          A362, method = "genetic", int.seed = 101,
+                          unif.seed = 101, pop.size = 500,
                           wait.generations = 20,
-                          MemoryMatrix = FALSE, ties = FALSE, 
+                          MemoryMatrix = FALSE, ties = FALSE,
                           discard = "control", data = data.make)
 
 # Note: approximately 48 hours on iMac to reach matching solution with this
@@ -889,10 +902,10 @@ out.PMI.s.flat <- matchit(PMI ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
 sum.s.PMI <- summary(out.PMI.s.flat, interactions = T, standardize = T)
 data.PMI.s.flat.matched <- match.data(out.PMI.s.flat)
 
-# write.csv(data.PMI.s.flat.matched,quote = F, 
+# write.csv(data.PMI.s.flat.matched,quote = F,
 # file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMI_Shaur_flat_matched_140422.csv", row.names = F)
 
-m2s <- lm(fl.5yr.postPML ~ PMI, weights = weights, 
+m2s <- lm(fl.5yr.postPML ~ PMI, weights = weights,
           data = data.PMI.s.flat.matched)
 summary(m2s)
 
@@ -936,17 +949,17 @@ m3s.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
             weights = weights, data = data.PMI.s.flat.matched)
 summary(m3s.4)
 
-m3s.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3s.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
             dist.disturb.pre + A128 + A129 + A130 + A347 + A361 + A362,
             weights = weights, data = data.PMI.s.flat.matched)
 summary(m3s.5)
 
-B3 <- multiplot(m1s, m2s, m3s, coefficients = "PMI", 
-                names = c("(a)", "(b)", "(c)"), 
-                title = NULL, ylab = NULL, 
+B3 <- multiplot(m1s, m2s, m3s, coefficients = "PMI",
+                names = c("(a)", "(b)", "(c)"),
+                title = NULL, ylab = NULL,
                 xlab = expression(paste("Effect on deforestation over 5 years (",
                                         m^{2} , " per " , km^{2}, ")")),
-                pointSize = 5, lwdOuter = 2, horizontal = TRUE, 
+                pointSize = 5, lwdOuter = 2, horizontal = TRUE,
                 secret.weapon = TRUE)
 B3 + theme_bw(base_size = 18) #Note: save as 600X400
 
@@ -958,18 +971,18 @@ B3 + theme_bw(base_size = 18) #Note: save as 600X400
 year <- seq(1:5)
 m1s.coef <- c(m1s.1$coef[2], m1s.2$coef[2], m1s.3$coef[2], m1s.4$coef[2],
               m1s.5$coef[2])
-m1s.se <- c(coef(summary(m1s.1))[2, 2], coef(summary(m1s.2))[2, 2], 
-            coef(summary(m1s.3))[2, 2], coef(summary(m1s.4))[2, 2], 
+m1s.se <- c(coef(summary(m1s.1))[2, 2], coef(summary(m1s.2))[2, 2],
+            coef(summary(m1s.3))[2, 2], coef(summary(m1s.4))[2, 2],
             coef(summary(m1s.5))[2, 2])
 m2s.coef <- c(m2s.1$coef[2], m2s.2$coef[2], m2s.3$coef[2], m2s.4$coef[2],
               m2s.5$coef[2])
-m2s.se <- c(coef(summary(m2s.1))[2, 2], coef(summary(m2s.2))[2, 2], 
-            coef(summary(m2s.3))[2, 2], coef(summary(m2s.4))[2, 2], 
+m2s.se <- c(coef(summary(m2s.1))[2, 2], coef(summary(m2s.2))[2, 2],
+            coef(summary(m2s.3))[2, 2], coef(summary(m2s.4))[2, 2],
             coef(summary(m2s.5))[2, 2])
 m3s.coef <- c(m3s.1$coef[2], m3s.2$coef[2], m3s.3$coef[2], m3s.4$coef[2],
               m3s.5$coef[2])
-m3s.se <- c(coef(summary(m3s.1))[2, 2], coef(summary(m3s.2))[2, 2], 
-            coef(summary(m3s.3))[2, 2], coef(summary(m3s.4))[2, 2], 
+m3s.se <- c(coef(summary(m3s.1))[2, 2], coef(summary(m3s.2))[2, 2],
+            coef(summary(m3s.3))[2, 2], coef(summary(m3s.4))[2, 2],
             coef(summary(m3s.5))[2, 2])
 
 par(mar = c(4.1, 5.1, 1.1, 1.1))
@@ -978,14 +991,14 @@ plot(1, type = "n", xlim = c(0.8, 5.2), ylim = c(-500, 550),
                              m^{2} , " per " , km^{2}, ")")),
      xlab = "Year", cex.lab = 1.2, cex.axis = 1.2)
 abline(h = 0,lty = 2)
-polygon(x = c(year[1:5], year[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
         y = c(m1s.coef + 2* m1s.se, m1s.coef[5:1] - 2 * m1s.se[5:1]),
         col = rgb(.6, .6, .6, 0.5), border = NA)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m2s.coef + 2* m2s.se, m2s.coef[5:1] - 2 * m2s.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m2s.coef + 2* m2s.se, m2s.coef[5:1] - 2 * m2s.se[5:1]),
         col = rgb(0, 0, 0.8, 0.5), border = NA)
-polygon(x = c(year[1:5], year[5:1]), 
-        y = c(m3s.coef  +2* m3s.se, m3s.coef[5:1] - 2 * m3s.se[5:1]), 
+polygon(x = c(year[1:5], year[5:1]),
+        y = c(m3s.coef  +2* m3s.se, m3s.coef[5:1] - 2 * m3s.se[5:1]),
         col = rgb(0, 0, 1, 0.5), border = NA)
 lines(year, m1s.coef, type = "l", col = "black", lwd = 5)
 lines(year, m2s.coef, type = "l", col = "blue", lwd = 5)
@@ -996,9 +1009,9 @@ lines(year, m3s.coef, type = "l", col = "blue", lwd = 5)
 
 # Setting up for EVI analysis
 
-names(data)[39:51] <- c("EVI_2000", "EVI_2001", "EVI_2002", "EVI_2003", 
-                        "EVI_2004", "EVI_2005", "EVI_2006", "EVI_2007", 
-                        "EVI_2008", "EVI_2009", "EVI_2010", "EVI_2011", 
+names(data)[39:51] <- c("EVI_2000", "EVI_2001", "EVI_2002", "EVI_2003",
+                        "EVI_2004", "EVI_2005", "EVI_2006", "EVI_2007",
+                        "EVI_2008", "EVI_2009", "EVI_2010", "EVI_2011",
                         "EVI_2012")
 
 data.evi <- subset(data, A360 == 6 | A360 == 12 | A360 == 13)
@@ -1026,7 +1039,7 @@ wave02$rain_yr2_diff <- wave02$A370 - wave02$A369
 wave02$rain_yr3_diff <- wave02$A371 - wave02$A370
 wave02$rain_yr4_diff <- wave02$A372 - wave02$A371
 wave02$rain_yr5_diff <- wave02$A373 - wave02$A372
-wave02 <- subset(wave02, forest.pre > 450000 & A346 == 0) 
+wave02 <- subset(wave02, forest.pre > 450000 & A346 == 0)
 
 wave03 <- subset(data.evi,(A352 == 3 | A352 == 0))
 wave03$EVI_pre <- wave03$EVI_2002
@@ -1118,7 +1131,7 @@ wave07$rain_yr2_diff <- wave07$A375 - wave07$A374
 wave07$rain_yr3_diff <- wave07$A376 - wave07$A375
 wave07$rain_yr4_diff <- wave07$A377 - wave07$A376
 wave07$rain_yr5_diff <- wave07$A378 - wave07$A377
-wave07 <- subset(wave07, forest.pre>450000 & A346 == 0) 
+wave07 <- subset(wave07, forest.pre>450000 & A346 == 0)
 
 data.flat.evi <- rbind(wave02, wave03, wave05, wave06, wave07)
 
@@ -1129,13 +1142,13 @@ data.flat.evi <- rbind(wave02, wave03, wave05, wave06, wave07)
 
 # Exact matching on these ecoregions and protected status by subsetting
 
-data.PML.flat <- subset(data.flat.evi,PMI == 0 & (A360 == 12 | A360 == 13) & 
-                        wave == "two" & A347 == 0) 
-data.PML.flat$EVI_5yr_down1000 <- 
+data.PML.flat <- subset(data.flat.evi,PMI == 0 & (A360 == 12 | A360 == 13) &
+                        wave == "two" & A347 == 0)
+data.PML.flat$EVI_5yr_down1000 <-
   ifelse(data.PML.flat$EVI_5yr_diff <= -1000, 1, 0)
-data.PML.flat$EVI_5yr_down1500 <- 
+data.PML.flat$EVI_5yr_down1500 <-
   ifelse(data.PML.flat$EVI_5yr_diff <= -1500, 1, 0)
-data.PML.flat$EVI_5yr_down2000 <- 
+data.PML.flat$EVI_5yr_down2000 <-
   ifelse(data.PML.flat$EVI_5yr_diff <= -2000, 1, 0)
 data.PML.flat$A360 <- as.factor(data.PML.flat$A360)
 
@@ -1147,54 +1160,54 @@ m1.pml <- glm(EVI_5yr_down1000 ~ PML + EVI.D.pre.5cell +
               family = binomial, data = data.PML.flat)
 summary(m1.pml)
 
-make(data.PML.flat, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, 
-                      EVI.D.yr3, EVI.D.yr4, EVI.D.yr5, PML, 
+make(data.PML.flat, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2,
+                      EVI.D.yr3, EVI.D.yr4, EVI.D.yr5, PML,
                       EVI.D.pre.5cell, EVI_t0, rain_5yr_diff,
-                      rain_yr1_diff, rain_yr2_diff, rain_yr3_diff, 
-                      rain_yr4_diff, rain_yr5_diff, forest.pre, 
-                      pop.den.5km.pre, dist.disturb.pre, A128, 
+                      rain_yr1_diff, rain_yr2_diff, rain_yr3_diff,
+                      rain_yr4_diff, rain_yr5_diff, forest.pre,
+                      pop.den.5km.pre, dist.disturb.pre, A128,
                       A129, A130, A154, A347, A360, A361, A362, id))
-out.PML.flat.evi <- matchit(PML ~ EVI.D.pre.5cell + EVI_t0 + 
+out.PML.flat.evi <- matchit(PML ~ EVI.D.pre.5cell + EVI_t0 +
                             pop.den.5km.pre + dist.disturb.pre +
-                            A128 + A129 + A130 + A154 + A360 + A361 + 
+                            A128 + A129 + A130 + A154 + A360 + A361 +
                             A362, method = "genetic", int.seed = 101,
                             unif.seed = 101, pop.size = 500,
                             wait.generations = 20, MemoryMatrix = FALSE,
-                            ties = FALSE, discard = "control", 
+                            ties = FALSE, discard = "control",
                             data = data.make)
 summary(out.PML.flat.evi, interactions = T, standardize = T)
 data.PML.flat.evi.matched <- match.data(out.PML.flat.evi)
 
 # write.csv(data.PML.flat.evi.matched,
-#           quote = F, 
-#           file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PML_flatevi_matched_141102.csv", 
+#           quote = F,
+#           file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PML_flatevi_matched_141102.csv",
 #           row.names = F)
 
-data.PML.flat.evi.matched$EVI_5yr_down500 <- 
+data.PML.flat.evi.matched$EVI_5yr_down500 <-
   ifelse(data.PML.flat.evi.matched$EVI_5yr_diff <= -500, 1, 0)
-data.PML.flat.evi.matched$EVI_5yr_down1000 <- 
+data.PML.flat.evi.matched$EVI_5yr_down1000 <-
   ifelse(data.PML.flat.evi.matched$EVI_5yr_diff <= -1000, 1, 0)
-data.PML.flat.evi.matched$EVI_5yr_down1500 <- 
+data.PML.flat.evi.matched$EVI_5yr_down1500 <-
   ifelse(data.PML.flat.evi.matched$EVI_5yr_diff <= -1500, 1, 0)
-data.PML.flat.evi.matched$EVI_5yr_down2000 <- 
+data.PML.flat.evi.matched$EVI_5yr_down2000 <-
   ifelse(data.PML.flat.evi.matched$EVI_5yr_diff <= -2000, 1, 0)
 
-m2.pml <- glm(EVI_5yr_down1000 ~ PML , family = binomial, 
+m2.pml <- glm(EVI_5yr_down1000 ~ PML , family = binomial,
               data = data.PML.flat.evi.matched, weights = weights)
 summary(m2.pml)
 
-m3.pml <- glm(EVI_5yr_down1000 ~ PML + EVI.D.pre.5cell + EVI_t0 + 
+m3.pml <- glm(EVI_5yr_down1000 ~ PML + EVI.D.pre.5cell + EVI_t0 +
               pop.den.5km.pre + dist.disturb.pre + A128 + A129 + A130 +
-              A154 + A360 + A361 + A362, family = binomial, 
+              A154 + A360 + A361 + A362, family = binomial,
               data = data.PML.flat.evi.matched, weights = weights)
 summary(m3.pml)
 
-B5 <- multiplot(m1.pml, m2.pml, m3.pml, 
-                coefficients = "PML", 
+B5 <- multiplot(m1.pml, m2.pml, m3.pml,
+                coefficients = "PML",
                 names = c("(a)", "(b)", "(c)"),
-                title = NULL, ylab = NULL, 
+                title = NULL, ylab = NULL,
                 xlab = expression(paste("Log-Odds of 0.1 Decrease in EVI over 5 Years")),
-                pointSize = 5, lwdOuter = 2, horizontal = TRUE, 
+                pointSize = 5, lwdOuter = 2, horizontal = TRUE,
                 secret.weapon = TRUE)
 B5 + theme_bw(base_size = 18) # Note: save as 600X400
 
@@ -1205,18 +1218,18 @@ B5 + theme_bw(base_size = 18) # Note: save as 600X400
 
 # Exact matching on these ecoregions by subsetting
 
-data.PMI.flat <- subset(data.flat.evi,(PML == 0 |PMI == 1) & 
-                         (A360 == 6 | A360 == 12)) 
-data.PMI.flat$EVI_5yr_down1000 <- 
+data.PMI.flat <- subset(data.flat.evi,(PML == 0 |PMI == 1) &
+                         (A360 == 6 | A360 == 12))
+data.PMI.flat$EVI_5yr_down1000 <-
   ifelse(data.PMI.flat$EVI_5yr_diff <= -1000, 1, 0)
-data.PMI.flat$EVI_5yr_down1500 <- 
+data.PMI.flat$EVI_5yr_down1500 <-
   ifelse(data.PMI.flat$EVI_5yr_diff <= -1500, 1, 0)
-data.PMI.flat$EVI_5yr_down2000 <- 
+data.PMI.flat$EVI_5yr_down2000 <-
   ifelse(data.PMI.flat$EVI_5yr_diff <= -2000, 1, 0)
 data.PMI.flat$A360 <- as.factor(data.PMI.flat$A360)
 
 m1 <- glm(EVI_5yr_down1000 ~ PMI + EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre +
-          dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A360 + A361 + 
+          dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A360 + A361 +
           A362 + wave, family = binomial, data = data.PMI.flat)
 summary(m1)
 
@@ -1225,13 +1238,13 @@ wave05.pmi <- subset(wave05,(PML == 0 |PMI == 1) & (A360 == 6 | A360 == 12))
 wave06.pmi <- subset(wave06,(PML == 0 |PMI == 1) & (A360 == 6 | A360 == 12))
 wave07.pmi <- subset(wave07,(PML == 0 |PMI == 1) & (A360 == 6 | A360 == 12))
 
-make(wave03.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4, 
-                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff, 
-                   rain_yr1_diff, rain_yr2_diff, rain_yr3_diff, rain_yr4_diff, 
-                   rain_yr5_diff, forest.pre, pop.den.5km.pre, 
+make(wave03.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4,
+                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff,
+                   rain_yr1_diff, rain_yr2_diff, rain_yr3_diff, rain_yr4_diff,
+                   rain_yr5_diff, forest.pre, pop.den.5km.pre,
                    dist.disturb.pre, A128, A129, A130, A154, A347, A360, A361,
                    A362, wave, id))
-out.wave03.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre + 
+out.wave03.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre +
                           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 +
                           A360 + A361 + A362, method = "genetic",
                           int.seed = 101, unif.seed = 101,pop.size = 500,
@@ -1240,44 +1253,44 @@ out.wave03.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre +
 summary(out.wave03.evi, interactions = T, standardize = T)
 data.wave03.evi.matched <- match.data(out.wave03.evi)
 
-make(wave05.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4, 
-                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff, 
+make(wave05.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4,
+                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff,
                    rain_yr1_diff, rain_yr2_diff, rain_yr3_diff, rain_yr4_diff,
-                   rain_yr5_diff, forest.pre, pop.den.5km.pre, 
+                   rain_yr5_diff, forest.pre, pop.den.5km.pre,
                    dist.disturb.pre, A128, A129, A130, A154, A347, A360, A361,
                    A362, wave, id))
 out.wave05.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre +
                           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 +
-                          A360 + A361 + A362, method = "genetic", 
-                          int.seed = 101, unif.seed = 101, pop.size = 500, 
-                          wait.generations = 20, MemoryMatrix = FALSE, 
+                          A360 + A361 + A362, method = "genetic",
+                          int.seed = 101, unif.seed = 101, pop.size = 500,
+                          wait.generations = 20, MemoryMatrix = FALSE,
                           ties = FALSE, discard = "control", data = data.make)
 summary(out.wave05.evi, interactions = T, standardize = T)
 data.wave05.evi.matched <- match.data(out.wave05.evi)
 
-make(wave06.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4, 
-                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff, 
+make(wave06.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4,
+                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff,
                    rain_yr1_diff, rain_yr2_diff, rain_yr3_diff, rain_yr4_diff,
-                   rain_yr5_diff, forest.pre, pop.den.5km.pre, 
-                   dist.disturb.pre, A128, A129, A130, A154, A347, A360, A361, 
+                   rain_yr5_diff, forest.pre, pop.den.5km.pre,
+                   dist.disturb.pre, A128, A129, A130, A154, A347, A360, A361,
                    A362, wave, id))
-out.wave06.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre + 
+out.wave06.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre +
                           dist.disturb.pre + A128 + A129 + A130 + A154 + A347 +
-                            A360 + A361 + A362, method = "genetic", 
+                            A360 + A361 + A362, method = "genetic",
                           int.seed = 101, unif.seed = 101, pop.size = 500,
-                          wait.generations = 20, MemoryMatrix = FALSE, 
+                          wait.generations = 20, MemoryMatrix = FALSE,
                           ties = FALSE, discard = "control", data = data.make)
 summary(out.wave06.evi, interactions = T, standardize = T)
 data.wave06.evi.matched <- match.data(out.wave06.evi)
 
-make(wave07.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4, 
-                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff, 
+make(wave07.pmi, c(EVI_5yr_diff, EVI.D.yr1, EVI.D.yr2, EVI.D.yr3, EVI.D.yr4,
+                   EVI.D.yr5, PMI, EVI.D.pre.5cell, EVI_t0, rain_5yr_diff,
                    rain_yr1_diff, rain_yr2_diff, rain_yr3_diff, rain_yr4_diff,
-                   rain_yr5_diff, forest.pre, pop.den.5km.pre, 
+                   rain_yr5_diff, forest.pre, pop.den.5km.pre,
                    dist.disturb.pre, A128, A129, A130, A154, A347, A360, A361,
                    A362, wave, id))
-out.wave07.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre + 
-                          dist.disturb.pre + A128 + A129 + A130 + A154 + 
+out.wave07.evi <- matchit(PMI ~ EVI.D.pre.5cell + EVI_t0 + pop.den.5km.pre +
+                          dist.disturb.pre + A128 + A129 + A130 + A154 +
                           A347 + A360 + A361 + A362, method = "genetic",
                           int.seed = 101, unif.seed = 101, pop.size = 500,
                           wait.generations = 20, MemoryMatrix = FALSE,
@@ -1289,36 +1302,36 @@ data.pmi.evi.matched <- rbind(data.wave03.evi.matched, data.wave05.evi.matched,
                               data.wave06.evi.matched, data.wave07.evi.matched)
 
 # write.csv(data.pmi.evi.matched,
-#           quote = F, 
-#           file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMI_wavesevi_matched_141110.csv", 
+#           quote = F,
+#           file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMI_wavesevi_matched_141110.csv",
 #           row.names = F)
 
 data.pmi.evi.matched$A360 <- as.factor(data.pmi.evi.matched$A360)
-data.pmi.evi.matched$EVI_5yr_down500 <- 
+data.pmi.evi.matched$EVI_5yr_down500 <-
   ifelse(data.pmi.evi.matched$EVI_5yr_diff <= -500, 1, 0)
-data.pmi.evi.matched$EVI_5yr_down1000 <- 
+data.pmi.evi.matched$EVI_5yr_down1000 <-
   ifelse(data.pmi.evi.matched$EVI_5yr_diff <= -1000, 1, 0)
-data.pmi.evi.matched$EVI_5yr_down1500 <- 
+data.pmi.evi.matched$EVI_5yr_down1500 <-
   ifelse(data.pmi.evi.matched$EVI_5yr_diff <= -1500, 1, 0)
-data.pmi.evi.matched$EVI_5yr_down2000 <- 
+data.pmi.evi.matched$EVI_5yr_down2000 <-
   ifelse(data.pmi.evi.matched$EVI_5yr_diff <= -2000, 1, 0)
 
-m2.waves <- glm(EVI_5yr_down1000 ~ PMI,family = binomial, 
+m2.waves <- glm(EVI_5yr_down1000 ~ PMI,family = binomial,
                 data = data.pmi.evi.matched, weights = weights)
 summary(m2.waves)
 
 m3.waves <- glm(EVI_5yr_down1000 ~ PMI + EVI.D.pre.5cell + EVI_t0 +
-                pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
-                A130 + A154 + A347 + A360 + A361 + A362 + wave, 
+                pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
+                A130 + A154 + A347 + A360 + A361 + A362 + wave,
                 family = binomial, data = data.pmi.evi.matched,
                 weights = weights)
 summary(m3.waves)
 
-B6 <- multiplot(m1, m2.waves, m3.waves, coefficients = "PMI", 
+B6 <- multiplot(m1, m2.waves, m3.waves, coefficients = "PMI",
                 names = c("(a)", "(b)", "(c)"), title = NULL,
                 ylab = NULL,
                 xlab = expression(paste("Log-Odds of 0.1 Decrease in EVI over 5 Years")),
-                pointSize = 5, lwdOuter = 2, horizontal = TRUE, 
+                pointSize = 5, lwdOuter = 2, horizontal = TRUE,
                 secret.weapon = TRUE)
 B6 + theme_bw(base_size = 18) #Note: save as 600X400
 
@@ -1328,48 +1341,48 @@ B6 + theme_bw(base_size = 18) #Note: save as 600X400
 # Figure B8 (Supporting Information)
 
 data.PMLonly.flat <- subset(data.flat, PML == 0 | (PML == 1 & PMI == 0))
-data.PMLonly.flat$toPeru.within10km <- 
+data.PMLonly.flat$toPeru.within10km <-
   ifelse(data.PMLonly.flat$toPeru.km <= 10, 1, 0)
 
 # Models for PML
 
-m1.PML <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre + 
+m1.PML <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
              pop.den.5km.pre + dist.disturb.pre + A128 + A129 + A130 + A154 +
              A347 + A361 + A362 + toPeru.km, data = data.PMLonly.flat)
 summary(m1.PML)
-m1.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.PML1 <- lm(fl.yr1 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362 + toPeru.km, data = data.PMLonly.flat)
 summary(m1.PML1)
-m1.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362 + toPeru.km, data = data.PMLonly.flat)
 summary(m1.PML2)
 m1.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362 + toPeru.km, data = data.PMLonly.flat)
 summary(m1.PML3)
-m1.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+m1.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362 + toPeru.km, data = data.PMLonly.flat)
 summary(m1.PML4)
 m1.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362 + toPeru.km, data = data.PMLonly.flat)
 summary(m1.PML5)
 
 make(data.PMLonly.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
-                          fl.yr5, PML, fl.pre.5cell, forest.pre, 
-                          pop.den.5km.pre, dist.disturb.pre, A128, 
-                          A129, A130, A154, A347, A361, A362, 
+                          fl.yr5, PML, fl.pre.5cell, forest.pre,
+                          pop.den.5km.pre, dist.disturb.pre, A128,
+                          A129, A130, A154, A347, A361, A362,
                           toPeru.within10km, id))
 out.PMLonly.flat <- matchit(PML ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
-                            dist.disturb.pre + A128 + A129 + A130 + A154 + 
+                            dist.disturb.pre + A128 + A129 + A130 + A154 +
                             A347 + A361 + A362 + toPeru.within10km,
-                            method = "genetic", int.seed = 102, 
-                            unif.seed = 102, pop.size = 1000, 
+                            method = "genetic", int.seed = 102,
+                            unif.seed = 102, pop.size = 1000,
                             wait.generations = 20, MemoryMatrix = FALSE,
-                            ties = FALSE, discard = "control", 
+                            ties = FALSE, discard = "control",
                             data = data.make)
 
 # Note: pop.size = 500, seed = 101 does not result in 0.1 Std. Mean Diff.
@@ -1379,31 +1392,31 @@ summary(out.PMLonly.flat, interactions = T, standardize = T)
 data.PMLonly.flat.matched <- match.data(out.PMLonly.flat)
 
 #write.csv(data.PMLonly.flat.matched,
-#   quote = F, 
-#   file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMLonly_flat_matched_toPeruBin_150311.csv", 
+#   quote = F,
+#   file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMLonly_flat_matched_toPeruBin_150311.csv",
 #   row.names = F)
 
 m2.PML <- lm(fl.5yr.postPML ~ PML, weights = weights,
              data = data.PMLonly.flat.matched)
 summary(m2.PML)
-m2.PML1 <- lm(fl.yr1 ~ PML, weights = weights, 
+m2.PML1 <- lm(fl.yr1 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML1)
-m2.PML2 <- lm(fl.yr2 ~ PML, weights = weights, 
+m2.PML2 <- lm(fl.yr2 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML2)
-m2.PML3 <- lm(fl.yr3 ~ PML, weights = weights, 
+m2.PML3 <- lm(fl.yr3 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML3)
-m2.PML4 <- lm(fl.yr4 ~ PML, weights = weights, 
+m2.PML4 <- lm(fl.yr4 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML4)
-m2.PML5 <- lm(fl.yr5 ~ PML, weights = weights, 
+m2.PML5 <- lm(fl.yr5 ~ PML, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m2.PML5)
 
 m3.PML <- lm(fl.5yr.postPML ~ PML + fl.pre.5cell + forest.pre +
-             pop.den.5km.pre + dist.disturb.pre + A128 + A129 + 
+             pop.den.5km.pre + dist.disturb.pre + A128 + A129 +
              A130 + A154 + A347 + A361 + A362 + toPeru.within10km,
              weights = weights, data = data.PMLonly.flat.matched)
 summary(m3.PML)
@@ -1418,22 +1431,22 @@ m3.PML2 <- lm(fl.yr2 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
               data = data.PMLonly.flat.matched)
 summary(m3.PML2)
 m3.PML3 <- lm(fl.yr3 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
-              A362 + toPeru.within10km, weights = weights, 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362 + toPeru.within10km, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m3.PML3)
 m3.PML4 <- lm(fl.yr4 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
-              A362 + toPeru.within10km, weights = weights, 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
+              A362 + toPeru.within10km, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m3.PML4)
 m3.PML5 <- lm(fl.yr5 ~ PML + fl.pre.5cell + forest.pre + pop.den.5km.pre +
-              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + 
+              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
               A362 + toPeru.within10km, weights = weights,
               data = data.PMLonly.flat.matched)
 summary(m3.PML5)
 
-B8 <- multiplot(m1.PML, m2.PML, m3.PML, coefficients = "PML", 
+B8 <- multiplot(m1.PML, m2.PML, m3.PML, coefficients = "PML",
                 names = c("(a)", "(b)", "(c)"), title = NULL,
                 ylab = NULL,
                 xlab = expression(paste("Effect on deforestation over 5 years (",
@@ -1447,7 +1460,7 @@ B8 + theme_bw(base_size = 18) # Note: save as 600X400
 
 # Figure B9 (Supporting Information)
 
-data.PMI.flat <- subset(data.flat,PML == 0 | (PML == 1 & PMI == 1)) 
+data.PMI.flat <- subset(data.flat,PML == 0 | (PML == 1 & PMI == 1))
 
 m1 <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
            dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + A362 +
@@ -1461,7 +1474,7 @@ m1.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km, data = data.PMI.flat)
 summary(m1.2)
-m1.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km, data = data.PMI.flat)
 summary(m1.3)
@@ -1469,21 +1482,21 @@ m1.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km, data = data.PMI.flat)
 summary(m1.4)
-m1.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m1.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km, data = data.PMI.flat)
 summary(m1.5)
 
-make(data.PMI.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4, 
-                      fl.yr5, PMI, fl.pre.5cell, forest.pre, 
-                      pop.den.5km.pre, dist.disturb.pre, A128, A129, 
+make(data.PMI.flat, c(fl.5yr.postPML, fl.yr1, fl.yr2, fl.yr3, fl.yr4,
+                      fl.yr5, PMI, fl.pre.5cell, forest.pre,
+                      pop.den.5km.pre, dist.disturb.pre, A128, A129,
                       A130, A154, A347, A361, A362, toPeru.km, id))
 out.PMI.flat <- matchit(PMI ~ fl.pre.5cell + forest.pre + pop.den.5km.pre +
                         dist.disturb.pre + A128 + A129 + A130 + A154 + A347 +
                         A361 + A362 + toPeru.km,
                         method = "genetic", int.seed = 101, unif.seed = 101,
                         pop.size = 500, wait.generations = 20,
-                        MemoryMatrix = FALSE, ties = FALSE, 
+                        MemoryMatrix = FALSE, ties = FALSE,
                         discard = "control", data = data.make)
 
 # Note: approximately 100 hours on iMac to reach matching solution with this
@@ -1493,8 +1506,8 @@ summary(out.PMI.flat, interactions = T, standardize = T)
 data.PMI.flat.matched <- match.data(out.PMI.flat)
 
 #write.csv(data.PMI.flat.matched,
-#  quote = F, 
-#  file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMI_flat_matched_toPeru_150302.csv", 
+#  quote = F,
+#  file = "~/Dropbox/Remote Sensing & Aid/PSUR/PSUR/PMI_flat_matched_toPeru_150302.csv",
 #  row.names = F)
 
 m2 <- lm(fl.5yr.postPML ~ PMI, weights = weights, data = data.PMI.flat.matched)
@@ -1506,7 +1519,7 @@ summary(m2.2)
 m2.3 <- lm(fl.yr3 ~ PMI, weights = weights, data = data.PMI.flat.matched)
 summary(m2.3)
 m2.4 <- lm(fl.yr4 ~ PMI, weights = weights, data = data.PMI.flat.matched)
-summary(m2.4) 
+summary(m2.4)
 m2.5 <- lm(fl.yr5 ~ PMI, weights = weights, data = data.PMI.flat.matched)
 summary(m2.5)
 
@@ -1514,23 +1527,23 @@ m3 <- lm(fl.5yr.postPML ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
            dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 + A362 +
            toPeru.km,weights = weights,data = data.PMI.flat.matched)
 summary(m3)
-m3.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3.1 <- lm(fl.yr1 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km,weights = weights,data = data.PMI.flat.matched)
 summary(m3.1)
-m3.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3.2 <- lm(fl.yr2 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km,weights = weights,data = data.PMI.flat.matched)
 summary(m3.2)
-m3.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3.3 <- lm(fl.yr3 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km,weights = weights,data = data.PMI.flat.matched)
 summary(m3.3)
-m3.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3.4 <- lm(fl.yr4 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km,weights = weights,data = data.PMI.flat.matched)
 summary(m3.4)
-m3.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre + 
+m3.5 <- lm(fl.yr5 ~ PMI + fl.pre.5cell + forest.pre + pop.den.5km.pre +
              dist.disturb.pre + A128 + A129 + A130 + A154 + A347 + A361 +
              A362 + toPeru.km,weights = weights,data = data.PMI.flat.matched)
 summary(m3.5)
